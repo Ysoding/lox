@@ -1,1 +1,1 @@
-# lox-interpreter
+# lox interpreter
