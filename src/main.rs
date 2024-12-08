@@ -10,6 +10,8 @@ pub mod cmd;
 use cmd::*;
 pub mod scanner;
 use scanner::*;
+pub mod token;
+use token::*;
 
 fn main() {
     let cli = Cli::parse();
@@ -50,6 +52,7 @@ fn run_prompt() {
 }
 
 fn run(source: String) {
-    let scanner = Scanner::new(source);
-    let tokens = scanner.scan_tokens();
+    let mut scanner = Scanner::new(source);
+    scanner.scan_tokens();
+    let mut tokens = scanner.tokens;
 }
