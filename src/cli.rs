@@ -7,5 +7,5 @@ use clap::Parser;
 pub struct Cli {
     /// Sets a script file
     #[arg(short, long, value_name = "FILE")]
-    pub script_file_path: Option<PathBuf>,
+    pub file: Option<PathBuf>,
 }

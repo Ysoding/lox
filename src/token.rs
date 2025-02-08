@@ -5,16 +5,16 @@ use std::any::Any;
 pub struct Token<'a> {
     pub typ: TokenType,
     pub lexeme: &'a str,
-    pub literal: Option<Box<dyn Any>>,
     pub line: usize,
 }
 
-impl<'a> fmt::Display for Token<'a> {
+impl fmt::Display for Token<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?} {} {:?}", self.typ, self.lexeme, self.literal)
+        write!(f, "{:?} {}", self.typ, self.lexeme)
     }
 }
 
+#[allow(dead_code)]
 #[derive(Debug, PartialEq, PartialOrd, Ord, Eq)]
 pub enum TokenType {
     // Single-character tokens.

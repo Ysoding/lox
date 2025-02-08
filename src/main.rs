@@ -15,7 +15,7 @@ mod token;
 
 fn main() {
     let cli = Cli::parse();
-    if let Some(file) = cli.script_file_path {
+    if let Some(file) = cli.file {
         run_file(file);
     } else {
         run_prompt();
@@ -54,13 +54,13 @@ fn run_prompt() {
 fn run(source: String) {
     let mut scanner = Scanner::new(&source);
     scanner.scan_tokens();
-    let tokens = scanner.tokens;
 
-    for token in tokens {
+    for token in scanner.tokens {
         if token.typ == TokenType::Error {
             error(token.line, token.lexeme);
             return;
         }
+        println!("{}", token);
     }
 }
 
