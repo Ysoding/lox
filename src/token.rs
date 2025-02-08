@@ -1,5 +1,4 @@
 use core::fmt;
-use std::any::Any;
 
 #[derive(Debug)]
 pub struct Token<'a> {
