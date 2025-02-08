@@ -6,12 +6,12 @@ use std::{
 
 use clap::Parser;
 
-pub mod cmd;
-use cmd::*;
-pub mod scanner;
+mod cli;
+use cli::*;
+mod scanner;
 use scanner::*;
-pub mod token;
-use token::*;
+use token::TokenType;
+mod token;
 
 fn main() {
     let cli = Cli::parse();
@@ -52,7 +52,22 @@ fn run_prompt() {
 }
 
 fn run(source: String) {
-    let mut scanner = Scanner::new(source);
+    let mut scanner = Scanner::new(&source);
     scanner.scan_tokens();
-    let mut tokens = scanner.tokens;
+    let tokens = scanner.tokens;
+
+    for token in tokens {
+        if token.typ == TokenType::Error {
+            error(token.line, token.lexeme);
+            return;
+        }
+    }
+}
+
+fn error(line: usize, msg: &str) {
+    report(line, "", msg);
+}
+
+fn report(line: usize, wh: &str, msg: &str) {
+    eprintln!("[line {} ] Error{}: {}", line, wh, msg);
 }
