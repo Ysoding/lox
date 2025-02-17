@@ -10,8 +10,12 @@ mod cli;
 use cli::*;
 mod scanner;
 use scanner::*;
-use token::TokenType;
 mod token;
+use token::*;
+mod parser;
+use parser::*;
+mod expr;
+use expr::*;
 
 fn main() {
     let cli = Cli::parse();
