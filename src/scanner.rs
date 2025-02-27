@@ -10,7 +10,7 @@ pub struct Scanner<'a> {
     current: usize,
     line: usize,
 
-    pub tokens: Vec<Token<'a>>,
+    pub tokens: Vec<Token>,
 }
 
 impl<'a> Scanner<'a> {
@@ -31,11 +31,8 @@ impl<'a> Scanner<'a> {
             self.scan_token();
         }
 
-        self.tokens.push(Token {
-            typ: TokenType::Eof,
-            lexeme: "",
-            line: self.line,
-        });
+        self.tokens
+            .push(Token::new(TokenType::Eof, "", self.line, None));
     }
 
     fn scan_token(&mut self) {
@@ -108,11 +105,12 @@ impl<'a> Scanner<'a> {
                     } else if ch.is_alphabetic() {
                         self.scan_identifier();
                     } else {
-                        self.tokens.push(Token {
-                            typ: TokenType::Error,
-                            lexeme: "Unexpected character.",
-                            line: self.line,
-                        });
+                        self.tokens.push(Token::new(
+                            TokenType::Error,
+                            "Unexpected character.",
+                            self.line,
+                            None,
+                        ));
                     }
                 }
             }
@@ -190,11 +188,12 @@ impl<'a> Scanner<'a> {
         }
 
         if self.is_at_end() {
-            self.tokens.push(Token {
-                typ: TokenType::Error,
-                lexeme: "Unterminated string.",
-                line: self.line,
-            });
+            self.tokens.push(Token::new(
+                TokenType::Error,
+                "Unterminated string.",
+                self.line,
+                None,
+            ));
             return;
         }
 
@@ -216,11 +215,12 @@ impl<'a> Scanner<'a> {
     }
 
     fn add_token(&mut self, typ: TokenType) {
-        self.tokens.push(Token {
+        self.tokens.push(Token::new(
             typ,
-            lexeme: &self.source[self.start..self.current],
-            line: self.line,
-        });
+            &self.source[self.start..self.current],
+            self.line,
+            None,
+        ));
     }
 
     fn peek(&mut self) -> Option<&char> {

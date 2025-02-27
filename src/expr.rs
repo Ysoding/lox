@@ -14,23 +14,23 @@ operator       → "==" | "!=" | "<" | "<=" | ">" | ">="
 
 use crate::token::*;
 
-#[derive(Debug)]
-pub enum Expr<'a> {
-    Assign(Token<'a>, Box<Expr<'a>>),
-    Binary(Box<Expr<'a>>, Token<'a>, Box<Expr<'a>>),
-    Call(Box<Expr<'a>>, Token<'a>, Vec<Expr<'a>>),
-    Get(Box<Expr<'a>>, Token<'a>),
-    Grouping(Box<Expr<'a>>),
+#[derive(Debug, Clone)]
+pub enum Expr {
+    Assign(Token, Box<Expr>),
+    Binary(Box<Expr>, Token, Box<Expr>),
+    Call(Box<Expr>, Token, Vec<Expr>),
+    Get(Box<Expr>, Token),
+    Grouping(Box<Expr>),
     Literal(Literal),
-    Logical(Box<Expr<'a>>, Token<'a>, Box<Expr<'a>>),
-    Set(Box<Expr<'a>>, Token<'a>, Box<Expr<'a>>),
-    Super(Token<'a>, Token<'a>),
-    This(Token<'a>),
-    Unary(Token<'a>, Box<Expr<'a>>),
-    Variable(Token<'a>),
+    Logical(Box<Expr>, Token, Box<Expr>),
+    Set(Box<Expr>, Token, Box<Expr>),
+    Super(Token, Token),
+    This(Token),
+    Unary(Token, Box<Expr>),
+    Variable(Token),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Literal {
     Number(f64),
     String(String),
@@ -39,11 +39,12 @@ pub enum Literal {
     Nil,
 }
 
+#[derive(Default)]
 pub struct AstPrinter;
 
-impl<'a> AstPrinter {
+impl AstPrinter {
     /// Prints an expression by recursively traversing the AST.
-    pub fn print(&self, expr: &Expr<'a>) -> String {
+    pub fn print(&self, expr: &Expr) -> String {
         match expr {
             Expr::Assign(name, value) => {
                 format!("(assign {} {})", name.lexeme, self.print(value))
@@ -100,18 +101,10 @@ mod tests {
         // (* (- 123) (group 45.67))
         let expr = Expr::Binary(
             Box::new(Expr::Unary(
-                Token {
-                    typ: TokenType::Minus,
-                    lexeme: "-",
-                    line: 1,
-                },
+                Token::new(TokenType::Minus, "-", 1, None),
                 Box::new(Expr::Literal(Literal::Number(123.0))),
             )),
-            Token {
-                typ: TokenType::Star,
-                lexeme: "*",
-                line: 1,
-            },
+            Token::new(TokenType::Star, "*", 1, None),
             Box::new(Expr::Grouping(Box::new(Expr::Literal(Literal::Number(
                 45.67,
             ))))),
