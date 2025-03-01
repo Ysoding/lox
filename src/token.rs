@@ -1,20 +1,42 @@
 use core::fmt;
 
-#[derive(Debug)]
-pub struct Token<'a> {
-    pub typ: TokenType,
-    pub lexeme: &'a str,
-    pub line: usize,
+#[derive(Debug, Clone)]
+pub enum Literal {
+    String(String),
+    Number(f64),
 }
 
-impl fmt::Display for Token<'_> {
+#[derive(Debug, Clone)]
+pub struct Token {
+    pub typ: TokenType,
+    pub lexeme: String,
+    pub line: usize,
+    pub literal: Option<Literal>,
+}
+
+impl Token {
+    pub fn new(typ: TokenType, lexeme: &str, line: usize, literal: Option<Literal>) -> Self {
+        Self {
+            typ,
+            lexeme: lexeme.to_string(),
+            line,
+            literal,
+        }
+    }
+}
+
+impl fmt::Display for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?} {}", self.typ, self.lexeme)
+        write!(
+            f,
+            "Token: {:?} {} {:?}",
+            self.typ, self.lexeme, self.literal
+        )
     }
 }
 
 #[allow(dead_code)]
-#[derive(Debug, PartialEq, PartialOrd, Ord, Eq)]
+#[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Clone, Copy)]
 pub enum TokenType {
     // Single-character tokens.
     LeftParen,
