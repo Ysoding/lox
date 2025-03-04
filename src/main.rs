@@ -82,8 +82,16 @@ fn run(source: String) -> RunnerResult {
         Ok(expr) => {
             println!("{}", AstPrinter::default().print(&expr));
 
-            Ok("Success".into())
+            let res = Interpreter::default().interpret(expr);
+            match res {
+                Ok(v) => Ok(v.stringify()),
+                Err(e) => Err(runtime_error(e)),
+            }
         }
         Err(e) => Err(e.to_string()),
     }
+}
+
+fn runtime_error(e: RuntimeError) -> String {
+    format!("{}\n[line {}]", e.message, e.token.line)
 }
