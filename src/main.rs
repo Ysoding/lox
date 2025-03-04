@@ -13,8 +13,10 @@ use scanner::*;
 mod token;
 use token::*;
 mod expr;
-mod parser;
 use expr::*;
+mod interpreter;
+use interpreter::*;
+mod parser;
 
 type RunnerResult = Result<String, String>;
 
