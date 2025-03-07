@@ -3,6 +3,7 @@ use thiserror::Error;
 
 use crate::{
     expr::Literal,
+    stmt::Stmt,
     token::{self, TokenType},
     Expr, Token,
 };
@@ -25,13 +26,42 @@ impl Parser {
         Self { tokens, current: 0 }
     }
 
-    pub fn parse(&mut self) -> ParseResult<Expr> {
-        self.expression()
+    pub fn parse(&mut self) -> ParseResult<Vec<Stmt>> {
+        let mut res = vec![];
+
+        while !self.is_at_end() {
+            res.push(self.statement()?);
+        }
+
+        Ok(res)
+    }
+
+    fn statement(&mut self) -> ParseResult<Stmt> {
+        if self.match_one(&TokenType::Print) {
+            return self.print_statement();
+        }
+
+        return self.expression_statement();
+    }
+
+    fn expression_statement(&mut self) -> ParseResult<Stmt> {
+        let expr = self.expression()?;
+        self.consume(&TokenType::Semicolon, "Expect ';' after value.")?;
+        Ok(Stmt::Expression(expr))
+    }
+
+    fn print_statement(&mut self) -> ParseResult<Stmt> {
+        let value = self.expression()?;
+        self.consume(&TokenType::Semicolon, "Expect ';' after value.")?;
+        Ok(Stmt::Print(value))
     }
 
     fn expression(&mut self) -> ParseResult<Expr> {
         self.equality()
+        // self.assignment()
     }
+
+    // fn assignment(&mut self) -> ParseResult<Expr> {}
 
     // equality       → comparison ( ( "!=" | "==" ) comparison )* ;
     fn equality(&mut self) -> ParseResult<Expr> {

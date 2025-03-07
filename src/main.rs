@@ -5,20 +5,9 @@ use std::{
 };
 
 use clap::Parser;
+use lox::{Cli, Interpreter, Parser as LoxParser, RuntimeError, Scanner, TokenType};
 
-mod cli;
-use cli::*;
-mod scanner;
-use scanner::*;
-mod token;
-use token::*;
-mod expr;
-use expr::*;
-mod interpreter;
-use interpreter::*;
-mod parser;
-
-type RunnerResult = Result<String, String>;
+type RunnerResult = Result<(), String>;
 
 fn main() {
     let cli = Cli::parse();
@@ -76,15 +65,15 @@ fn run(source: String) -> RunnerResult {
                 token.line, token.lexeme
             ));
         }
+        // println!("{}", token);
     }
-    let mut parser = parser::Parser::new(scanner.tokens);
-    match parser.parse() {
-        Ok(expr) => {
-            println!("{}", AstPrinter::default().print(&expr));
 
-            let res = Interpreter::default().interpret(expr);
+    let mut parser = LoxParser::new(scanner.tokens);
+    match parser.parse() {
+        Ok(stmts) => {
+            let res = Interpreter::default().interpret(stmts);
             match res {
-                Ok(v) => Ok(v.stringify()),
+                Ok(v) => Ok(v),
                 Err(e) => Err(runtime_error(e)),
             }
         }

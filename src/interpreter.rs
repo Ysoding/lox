@@ -1,6 +1,8 @@
+use std::fmt;
 use std::ops::Neg;
 
-use crate::expr::Expr;
+use crate::expr::{self, Expr};
+use crate::stmt::Stmt;
 use crate::token::{Token, TokenType};
 
 #[derive(Debug, Clone)]
@@ -36,9 +38,23 @@ impl Value {
             _ => false,
         }
     }
+}
 
-    pub fn stringify(&self) -> String {
-        match self {
+impl From<&expr::Literal> for Value {
+    fn from(value: &expr::Literal) -> Self {
+        match value {
+            expr::Literal::Number(v) => Value::Number(*v),
+            expr::Literal::String(v) => Value::String(v.clone()),
+            expr::Literal::True => Value::Boolean(true),
+            expr::Literal::False => Value::Boolean(false),
+            expr::Literal::Nil => Value::Nil,
+        }
+    }
+}
+
+impl fmt::Display for Value {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let v = match self {
             Value::Number(n) => {
                 let text = n.to_string();
                 if text.ends_with(".0") {
@@ -50,7 +66,8 @@ impl Value {
             Value::String(s) => s.clone(),
             Value::Boolean(b) => b.to_string(),
             Value::Nil => "nil".to_string(),
-        }
+        };
+        f.write_str(&v)
     }
 }
 
@@ -70,9 +87,11 @@ impl Neg for Value {
 pub struct Interpreter {}
 
 impl Interpreter {
-    pub fn interpret(&self, expr: Expr) -> Result<Value, RuntimeError> {
-        let value = self.evaluate(&expr)?;
-        Ok(value)
+    pub fn interpret(&self, stmts: Vec<Stmt>) -> Result<(), RuntimeError> {
+        for stmt in &stmts {
+            self.execute_stmt(stmt)?;
+        }
+        Ok(())
     }
 
     fn check_number_operand(&self, token: &Token, operand: &Value) -> Result<(), RuntimeError> {
@@ -156,12 +175,33 @@ impl Interpreter {
         }
     }
 
-    fn evaluate(&self, expr: &Expr) -> Result<Value, RuntimeError> {
+    fn execute_stmt(&self, stmt: &Stmt) -> Result<(), RuntimeError> {
+        match stmt {
+            Stmt::Block => todo!(),
+            Stmt::Class => todo!(),
+            Stmt::Expression(expr) => {
+                let _value = self.evaluate_expr(expr)?;
+                // println!("{}", value);
+            }
+            Stmt::Function => todo!(),
+            Stmt::If => todo!(),
+            Stmt::Print(expr) => {
+                let value = self.evaluate_expr(expr)?;
+                println!("{}", value);
+            }
+            Stmt::Return => todo!(),
+            Stmt::Var => todo!(),
+            Stmt::While => todo!(),
+        }
+        Ok(())
+    }
+
+    fn evaluate_expr(&self, expr: &Expr) -> Result<Value, RuntimeError> {
         match expr {
             Expr::Assign(token, expr) => todo!(),
             Expr::Binary(left, operator, right) => {
-                let left_val = self.evaluate(left)?;
-                let right_val = self.evaluate(right)?;
+                let left_val = self.evaluate_expr(left)?;
+                let right_val = self.evaluate_expr(right)?;
                 match operator.typ {
                     TokenType::Plus => self.handle_plus(operator, &left_val, &right_val),
                     TokenType::Minus => {
@@ -195,14 +235,14 @@ impl Interpreter {
             }
             Expr::Call(expr, token, exprs) => todo!(),
             Expr::Get(expr, token) => todo!(),
-            Expr::Grouping(expr) => self.evaluate(&expr),
-            Expr::Literal(literal) => todo!(),
+            Expr::Grouping(expr) => self.evaluate_expr(&expr),
+            Expr::Literal(literal) => Ok(Value::from(literal)),
             Expr::Logical(expr, token, expr1) => todo!(),
             Expr::Set(expr, token, expr1) => todo!(),
             Expr::Super(token, token1) => todo!(),
             Expr::This(token) => todo!(),
             Expr::Unary(operator, right) => {
-                let right_val = self.evaluate(&right)?;
+                let right_val = self.evaluate_expr(&right)?;
                 match operator.typ {
                     TokenType::Minus => {
                         self.check_number_operand(operator, &right_val)?;
