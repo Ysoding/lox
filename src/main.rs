@@ -25,7 +25,8 @@ fn main() {
 fn run_file(file_path: PathBuf) -> RunnerResult {
     let source =
         fs::read_to_string(file_path).map_err(|e| format!("Failed to read file: {}", e))?;
-    run(source)
+    let mut interp = Interpreter::default();
+    run(source, &mut interp)
 }
 
 fn run_prompt() -> RunnerResult {
@@ -39,6 +40,7 @@ fn run_prompt() -> RunnerResult {
 
     let mut input = io::stdin().lock();
     let mut output = io::stdout();
+    let mut interpreter = Interpreter::default();
 
     let mut buffer = String::new();
     loop {
@@ -46,7 +48,7 @@ fn run_prompt() -> RunnerResult {
         output.flush().unwrap();
 
         input.read_line(&mut buffer).unwrap();
-        if let Err(e) = run(buffer.clone()) {
+        if let Err(e) = run(buffer.clone(), &mut interpreter) {
             println!("{}", e);
         }
 
@@ -54,7 +56,7 @@ fn run_prompt() -> RunnerResult {
     }
 }
 
-fn run(source: String) -> RunnerResult {
+fn run(source: String, interpreter: &mut Interpreter) -> RunnerResult {
     let mut scanner = Scanner::new(&source);
     scanner.scan_tokens();
 
@@ -71,7 +73,7 @@ fn run(source: String) -> RunnerResult {
     let mut parser = LoxParser::new(scanner.tokens);
     match parser.parse() {
         Ok(stmts) => {
-            let res = Interpreter::default().interpret(stmts);
+            let res = interpreter.interpret(stmts);
             match res {
                 Ok(v) => Ok(v),
                 Err(e) => Err(runtime_error(e)),

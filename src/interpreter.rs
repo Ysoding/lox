@@ -1,8 +1,10 @@
+use std::collections::HashMap;
 use std::fmt;
 use std::ops::Neg;
 
-use crate::expr::{self, Expr};
-use crate::stmt::Stmt;
+use anyhow::Result;
+
+use crate::expr::{self, Expr, Stmt};
 use crate::token::{Token, TokenType};
 
 #[derive(Debug, Clone)]
@@ -11,6 +13,7 @@ pub struct RuntimeError {
     pub message: String,
 }
 
+#[derive(Clone)]
 pub enum Value {
     Number(f64),
     String(String),
@@ -82,12 +85,35 @@ impl Neg for Value {
         }
     }
 }
+#[derive(Default)]
+pub struct Environment {
+    values: HashMap<String, Value>,
+}
+
+impl Environment {
+    pub fn define(&mut self, name: &str, value: Value) {
+        self.values.insert(name.to_string(), value);
+    }
+
+    pub fn get(&self, name: &Token) -> Result<Value, RuntimeError> {
+        if self.values.contains_key(&name.lexeme) {
+            Ok(self.values.get(&name.lexeme).unwrap().clone())
+        } else {
+            Err(RuntimeError {
+                token: name.clone(),
+                message: format!("Undefined variable '{}'.", name.lexeme),
+            })
+        }
+    }
+}
 
 #[derive(Default)]
-pub struct Interpreter {}
+pub struct Interpreter {
+    env: Environment,
+}
 
 impl Interpreter {
-    pub fn interpret(&self, stmts: Vec<Stmt>) -> Result<(), RuntimeError> {
+    pub fn interpret(&mut self, stmts: Vec<Stmt>) -> Result<(), RuntimeError> {
         for stmt in &stmts {
             self.execute_stmt(stmt)?;
         }
@@ -175,7 +201,7 @@ impl Interpreter {
         }
     }
 
-    fn execute_stmt(&self, stmt: &Stmt) -> Result<(), RuntimeError> {
+    fn execute_stmt(&mut self, stmt: &Stmt) -> Result<(), RuntimeError> {
         match stmt {
             Stmt::Block => todo!(),
             Stmt::Class => todo!(),
@@ -190,8 +216,14 @@ impl Interpreter {
                 println!("{}", value);
             }
             Stmt::Return => todo!(),
-            Stmt::Var => todo!(),
             Stmt::While => todo!(),
+            Stmt::Var(name, initializer) => {
+                let value = match initializer {
+                    Some(v) => self.evaluate_expr(v)?,
+                    None => Value::Nil,
+                };
+                self.env.define(&name.lexeme, value);
+            }
         }
         Ok(())
     }
@@ -255,7 +287,7 @@ impl Interpreter {
                     }),
                 }
             }
-            Expr::Variable(token) => todo!(),
+            Expr::Variable(name) => self.env.get(name),
         }
     }
 }

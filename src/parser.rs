@@ -2,8 +2,7 @@ use anyhow::Result;
 use thiserror::Error;
 
 use crate::{
-    expr::Literal,
-    stmt::Stmt,
+    expr::{Literal, Stmt},
     token::{self, TokenType},
     Expr, Token,
 };
@@ -30,10 +29,35 @@ impl Parser {
         let mut res = vec![];
 
         while !self.is_at_end() {
-            res.push(self.statement()?);
+            res.push(self.declaration()?);
         }
 
         Ok(res)
+    }
+
+    fn declaration(&mut self) -> ParseResult<Stmt> {
+        if self.match_one(&TokenType::Var) {
+            return self.var_declaration();
+        }
+
+        return self.statement();
+    }
+
+    fn var_declaration(&mut self) -> ParseResult<Stmt> {
+        let name = self
+            .consume(&TokenType::Identifier, "Expect variable name.")?
+            .clone();
+
+        let initializer = if self.match_one(&TokenType::Equal) {
+            Some(self.expression()?)
+        } else {
+            None
+        };
+        self.consume(
+            &TokenType::Semicolon,
+            "Expect ';' after variable declaration.",
+        )?;
+        Ok(Stmt::Var(name, initializer))
     }
 
     fn statement(&mut self) -> ParseResult<Stmt> {
@@ -125,7 +149,7 @@ impl Parser {
         return self.primary();
     }
 
-    // primary        → NUMBER | STRING | "true" | "false" | "nil" | "(" expression ")" ;
+    // primary        → NUMBER | STRING | "true" | "false" | "nil" | "(" expression ")" | IDENTIFIER ;
     fn primary(&mut self) -> ParseResult<Expr> {
         if self.match_one(&TokenType::False) {
             return Ok(Expr::Literal(Literal::False));
@@ -182,6 +206,10 @@ impl Parser {
             let expr = self.expression()?;
             self.consume(&TokenType::RightParen, "Expect ')' after expression.")?;
             return Ok(Expr::Grouping(Box::new(expr)));
+        }
+
+        if self.match_one(&TokenType::Identifier) {
+            return Ok(Expr::Variable(self.previous().clone()));
         }
 
         Err(ParseError::Internal {
