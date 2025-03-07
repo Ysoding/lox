@@ -105,6 +105,18 @@ impl Environment {
             })
         }
     }
+
+    fn assign(&mut self, name: &Token, val: Value) -> Result<(), RuntimeError> {
+        if self.values.contains_key(&name.lexeme) {
+            self.values.insert(name.lexeme.to_string(), val);
+            Ok(())
+        } else {
+            Err(RuntimeError {
+                token: name.clone(),
+                message: format!("Undefined variable '{}'.", name.lexeme),
+            })
+        }
+    }
 }
 
 #[derive(Default)]
@@ -228,9 +240,13 @@ impl Interpreter {
         Ok(())
     }
 
-    fn evaluate_expr(&self, expr: &Expr) -> Result<Value, RuntimeError> {
+    fn evaluate_expr(&mut self, expr: &Expr) -> Result<Value, RuntimeError> {
         match expr {
-            Expr::Assign(token, expr) => todo!(),
+            Expr::Assign(name, value) => {
+                let val = self.evaluate_expr(value)?;
+                self.env.assign(name, val.clone())?;
+                Ok(val)
+            }
             Expr::Binary(left, operator, right) => {
                 let left_val = self.evaluate_expr(left)?;
                 let right_val = self.evaluate_expr(right)?;

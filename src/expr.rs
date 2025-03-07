@@ -10,10 +10,8 @@ statement      → exprStmt
 exprStmt       → expression ";" ;
 printStmt      → "print" expression ";" ;
 
-expression     → literal
-               | unary
-               | binary
-               | grouping ;
+expression     → assignment ;
+assignment     → IDENTIFIER "=" assignment | equality ;
 
 literal        → NUMBER | STRING | "true" | "false" | "nil" ;
 grouping       → "(" expression ")" ;
