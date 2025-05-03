@@ -1,8 +1,17 @@
 /*
-expression     → literal
-               | unary
-               | binary
-               | grouping ;
+program        → statement* EOF ;
+
+declaration    → varDecl
+               | statement ;
+
+statement      → exprStmt
+               | printStmt ;
+
+exprStmt       → expression ";" ;
+printStmt      → "print" expression ";" ;
+
+expression     → assignment ;
+assignment     → IDENTIFIER "=" assignment | equality ;
 
 literal        → NUMBER | STRING | "true" | "false" | "nil" ;
 grouping       → "(" expression ")" ;
@@ -13,6 +22,19 @@ operator       → "==" | "!=" | "<" | "<=" | ">" | ">="
 */
 
 use crate::token::*;
+
+#[derive(Debug, Clone)]
+pub enum Stmt {
+    Block,
+    Class,
+    Expression(Expr),
+    Function,
+    If,
+    Print(Expr),
+    Return,
+    Var(Token, Option<Expr>),
+    While,
+}
 
 #[derive(Debug, Clone)]
 pub enum Expr {

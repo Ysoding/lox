@@ -1,6 +1,6 @@
 use std::{iter::Peekable, str::Chars};
 
-use crate::token::{Token, TokenType};
+use crate::token::{Literal, Token, TokenType};
 
 #[derive(Debug)]
 pub struct Scanner<'a> {
@@ -143,7 +143,9 @@ impl<'a> Scanner<'a> {
             }
         }
 
-        self.add_token(TokenType::Number);
+        let val: f64 = self.source[self.start..self.current].parse().unwrap();
+
+        self.add_token_literal(TokenType::Number, Some(Literal::Number(val)));
     }
 
     fn scan_identifier(&mut self) {
@@ -200,7 +202,12 @@ impl<'a> Scanner<'a> {
         // "
         self.advance();
         // "v"
-        self.add_token(TokenType::String);
+        self.add_token_literal(
+            TokenType::String,
+            Some(Literal::String(
+                self.source[self.start..self.current].to_string(),
+            )),
+        );
     }
 
     fn _match(&mut self, ch: char) -> bool {
@@ -215,11 +222,15 @@ impl<'a> Scanner<'a> {
     }
 
     fn add_token(&mut self, typ: TokenType) {
+        self.add_token_literal(typ, None);
+    }
+
+    fn add_token_literal(&mut self, typ: TokenType, literal: Option<Literal>) {
         self.tokens.push(Token::new(
             typ,
             &self.source[self.start..self.current],
             self.line,
-            None,
+            literal,
         ));
     }
 

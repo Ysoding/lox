@@ -2,7 +2,7 @@ use anyhow::Result;
 use thiserror::Error;
 
 use crate::{
-    expr::Literal,
+    expr::{Literal, Stmt},
     token::{self, TokenType},
     Expr, Token,
 };
@@ -25,12 +25,83 @@ impl Parser {
         Self { tokens, current: 0 }
     }
 
-    pub fn parse(&mut self) -> ParseResult<Expr> {
-        self.expression()
+    pub fn parse(&mut self) -> ParseResult<Vec<Stmt>> {
+        let mut res = vec![];
+
+        while !self.is_at_end() {
+            res.push(self.declaration()?);
+        }
+
+        Ok(res)
+    }
+
+    fn declaration(&mut self) -> ParseResult<Stmt> {
+        if self.match_one(&TokenType::Var) {
+            return self.var_declaration();
+        }
+
+        return self.statement();
+    }
+
+    fn var_declaration(&mut self) -> ParseResult<Stmt> {
+        let name = self
+            .consume(&TokenType::Identifier, "Expect variable name.")?
+            .clone();
+
+        let initializer = if self.match_one(&TokenType::Equal) {
+            Some(self.expression()?)
+        } else {
+            None
+        };
+        self.consume(
+            &TokenType::Semicolon,
+            "Expect ';' after variable declaration.",
+        )?;
+        Ok(Stmt::Var(name, initializer))
+    }
+
+    fn statement(&mut self) -> ParseResult<Stmt> {
+        if self.match_one(&TokenType::Print) {
+            return self.print_statement();
+        }
+
+        return self.expression_statement();
+    }
+
+    fn expression_statement(&mut self) -> ParseResult<Stmt> {
+        let expr = self.expression()?;
+        self.consume(&TokenType::Semicolon, "Expect ';' after value.")?;
+        Ok(Stmt::Expression(expr))
+    }
+
+    fn print_statement(&mut self) -> ParseResult<Stmt> {
+        let value = self.expression()?;
+        self.consume(&TokenType::Semicolon, "Expect ';' after value.")?;
+        Ok(Stmt::Print(value))
     }
 
     fn expression(&mut self) -> ParseResult<Expr> {
-        self.equality()
+        self.assignment()
+    }
+
+    fn assignment(&mut self) -> ParseResult<Expr> {
+        let expr = self.equality()?;
+
+        if self.match_one(&TokenType::Equal) {
+            // let equals = self.previous().clone();
+            let value = self.assignment()?;
+
+            if let Expr::Variable(name) = expr {
+                return Ok(Expr::Assign(name, Box::new(value)));
+            }
+
+            return Err(ParseError::Internal {
+                line: self.previous().line,
+                message: "Invalid assignment target.".to_string(),
+            });
+        }
+
+        Ok(expr)
     }
 
     // equality       → comparison ( ( "!=" | "==" ) comparison )* ;
@@ -95,7 +166,7 @@ impl Parser {
         return self.primary();
     }
 
-    // primary        → NUMBER | STRING | "true" | "false" | "nil" | "(" expression ")" ;
+    // primary        → NUMBER | STRING | "true" | "false" | "nil" | "(" expression ")" | IDENTIFIER ;
     fn primary(&mut self) -> ParseResult<Expr> {
         if self.match_one(&TokenType::False) {
             return Ok(Expr::Literal(Literal::False));
@@ -152,6 +223,10 @@ impl Parser {
             let expr = self.expression()?;
             self.consume(&TokenType::RightParen, "Expect ')' after expression.")?;
             return Ok(Expr::Grouping(Box::new(expr)));
+        }
+
+        if self.match_one(&TokenType::Identifier) {
+            return Ok(Expr::Variable(self.previous().clone()));
         }
 
         Err(ParseError::Internal {
