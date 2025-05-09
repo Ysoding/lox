@@ -6,6 +6,7 @@ use anyhow::Result;
 
 use crate::expr::{self, Expr, Stmt};
 use crate::token::{Token, TokenType};
+use crate::{LoxError, Parser, Scanner};
 
 #[derive(Debug, Clone)]
 pub struct RuntimeError {
@@ -85,37 +86,67 @@ impl Neg for Value {
         }
     }
 }
-#[derive(Default)]
-pub struct Environment {
+
+#[derive(Clone)]
+struct Environment {
     values: HashMap<String, Value>,
+    enclosing: Option<Box<Environment>>,
+}
+
+impl Default for Environment {
+    fn default() -> Self {
+        Self {
+            values: Default::default(),
+            enclosing: None,
+        }
+    }
 }
 
 impl Environment {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_enclosing(enclosing: Box<Environment>) -> Self {
+        Self {
+            values: HashMap::new(),
+            enclosing: Some(enclosing),
+        }
+    }
+
     pub fn define(&mut self, name: &str, value: Value) {
         self.values.insert(name.to_string(), value);
     }
 
     pub fn get(&self, name: &Token) -> Result<Value, RuntimeError> {
         if self.values.contains_key(&name.lexeme) {
-            Ok(self.values.get(&name.lexeme).unwrap().clone())
-        } else {
-            Err(RuntimeError {
-                token: name.clone(),
-                message: format!("Undefined variable '{}'.", name.lexeme),
-            })
+            return Ok(self.values.get(&name.lexeme).unwrap().clone());
         }
+
+        if let Some(enclosing) = &self.enclosing {
+            return enclosing.get(name);
+        }
+
+        Err(RuntimeError {
+            token: name.clone(),
+            message: format!("Undefined variable '{}'.", name.lexeme),
+        })
     }
 
-    fn assign(&mut self, name: &Token, val: Value) -> Result<(), RuntimeError> {
+    pub fn assign(&mut self, name: &Token, val: Value) -> Result<(), RuntimeError> {
         if self.values.contains_key(&name.lexeme) {
             self.values.insert(name.lexeme.to_string(), val);
-            Ok(())
-        } else {
-            Err(RuntimeError {
-                token: name.clone(),
-                message: format!("Undefined variable '{}'.", name.lexeme),
-            })
+            return Ok(());
         }
+
+        if let Some(enclosing) = &mut self.enclosing {
+            return enclosing.assign(name, val);
+        }
+
+        return Err(RuntimeError {
+            token: name.clone(),
+            message: format!("Undefined variable '{}'.", name.lexeme),
+        });
     }
 }
 
@@ -215,14 +246,12 @@ impl Interpreter {
 
     fn execute_stmt(&mut self, stmt: &Stmt) -> Result<(), RuntimeError> {
         match stmt {
-            Stmt::Block => todo!(),
             Stmt::Class => todo!(),
             Stmt::Expression(expr) => {
                 let _value = self.evaluate_expr(expr)?;
                 // println!("{}", value);
             }
             Stmt::Function => todo!(),
-            Stmt::If => todo!(),
             Stmt::Print(expr) => {
                 let value = self.evaluate_expr(expr)?;
                 println!("{}", value);
@@ -236,8 +265,44 @@ impl Interpreter {
                 };
                 self.env.define(&name.lexeme, value);
             }
+            Stmt::If(condition, then_stmt, else_stmt) => {
+                if self.evaluate_expr(condition)?.is_truthy() {
+                    self.execute_stmt(then_stmt)?;
+                } else if let Some(else_stmt) = else_stmt {
+                    self.execute_stmt(else_stmt)?;
+                }
+            }
+            Stmt::Block(stmts) => {
+                let block_env = Environment::with_enclosing(Box::new(self.env.clone()));
+                self.execute_block(stmts, block_env)?;
+            }
         }
         Ok(())
+    }
+
+    fn execute_block(
+        &mut self,
+        stmts: &[Box<Stmt>],
+        block_env: Environment,
+    ) -> Result<Value, RuntimeError> {
+        let outer_env = self.env.clone();
+
+        self.env = block_env.clone();
+
+        let mut err = None;
+        for stmt in stmts {
+            if let Err(e) = self.execute_stmt(stmt) {
+                err = Some(e);
+                break;
+            }
+        }
+
+        self.env = outer_env;
+        if let Some(e) = err {
+            return Err(e);
+        }
+
+        Ok(Value::Nil)
     }
 
     fn evaluate_expr(&mut self, expr: &Expr) -> Result<Value, RuntimeError> {
@@ -306,4 +371,40 @@ impl Interpreter {
             Expr::Variable(name) => self.env.get(name),
         }
     }
+}
+
+pub fn run_interpreter(source_code: &str, interpreter: &mut Interpreter) -> Result<(), LoxError> {
+    print!("{}", source_code);
+    let mut scanner = Scanner::new(source_code);
+    scanner.scan_tokens();
+
+    for token in &scanner.tokens {
+        if token.typ == TokenType::Error {
+            eprintln!("[line {}] Error: Unexpected character.", token.line);
+            return Err(LoxError::CompileError);
+        }
+        println!("{}", token);
+    }
+
+    let mut parser = Parser::new(scanner.tokens);
+    match parser.parse() {
+        Ok(stmts) => {
+            let res = interpreter.interpret(stmts);
+            match res {
+                Ok(v) => Ok(v),
+                Err(e) => {
+                    runtime_error(e);
+                    Err(LoxError::RuntimeError)
+                }
+            }
+        }
+        Err(e) => {
+            eprintln!("{}", e);
+            Err(LoxError::CompileError)
+        }
+    }
+}
+
+fn runtime_error(e: RuntimeError) {
+    eprintln!("[line {}] {}", e.token.line, e.message);
 }

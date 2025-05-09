@@ -1,5 +1,6 @@
+use std::{error::Error, fmt};
+
 use anyhow::Result;
-use thiserror::Error;
 
 use crate::{
     expr::{Literal, Stmt},
@@ -7,10 +8,24 @@ use crate::{
     Expr, Token,
 };
 
-#[derive(Debug, Error)]
-pub enum ParseError {
-    #[error("Parser error at line {line}: {message}")]
-    Internal { line: usize, message: String },
+#[derive(Debug)]
+pub struct ParseError {
+    message: String,
+    token: Token,
+}
+
+impl Error for ParseError {}
+
+impl fmt::Display for ParseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "[line {}] Error", self.token.line)?;
+        match self.token.typ {
+            TokenType::Eof => write!(f, " at end"),
+            TokenType::Error => Ok(()),
+            _ => write!(f, " at '{}'", self.token.lexeme),
+        }?;
+        write!(f, ": {}", self.message)
+    }
 }
 
 pub type ParseResult<T> = Result<T, ParseError>;
@@ -61,11 +76,30 @@ impl Parser {
     }
 
     fn statement(&mut self) -> ParseResult<Stmt> {
+        if self.match_one(&TokenType::If) {
+            return self.if_statement();
+        }
+
         if self.match_one(&TokenType::Print) {
             return self.print_statement();
         }
 
+        if self.match_one(&TokenType::LeftBrace) {
+            return self.block_statement();
+        }
+
         return self.expression_statement();
+    }
+
+    fn block_statement(&mut self) -> ParseResult<Stmt> {
+        let mut statments = vec![];
+
+        while !self.check(&TokenType::RightBrace) && !self.is_at_end() {
+            statments.push(Box::new(self.declaration()?));
+        }
+
+        self.consume(&TokenType::RightBrace, "Expect ')' after block.")?;
+        Ok(Stmt::Block(statments))
     }
 
     fn expression_statement(&mut self) -> ParseResult<Stmt> {
@@ -78,6 +112,21 @@ impl Parser {
         let value = self.expression()?;
         self.consume(&TokenType::Semicolon, "Expect ';' after value.")?;
         Ok(Stmt::Print(value))
+    }
+
+    fn if_statement(&mut self) -> ParseResult<Stmt> {
+        self.consume(&TokenType::LeftParen, "Expect '(' after 'if'.")?;
+        let condition = self.expression()?;
+        self.consume(&TokenType::RightParen, "Expect ')' after if condition.")?;
+
+        let then_branch = self.statement()?;
+        let else_branch = if self.match_one(&TokenType::Else) {
+            Some(Box::new(self.statement()?))
+        } else {
+            None
+        };
+
+        Ok(Stmt::If(condition, Box::new(then_branch), else_branch))
     }
 
     fn expression(&mut self) -> ParseResult<Expr> {
@@ -95,13 +144,17 @@ impl Parser {
                 return Ok(Expr::Assign(name, Box::new(value)));
             }
 
-            return Err(ParseError::Internal {
-                line: self.previous().line,
-                message: "Invalid assignment target.".to_string(),
-            });
+            return Err(self.error("Invalid assignment target."));
         }
 
         Ok(expr)
+    }
+
+    fn error(&mut self, msg: &str) -> ParseError {
+        return ParseError {
+            token: self.previous().clone(),
+            message: msg.to_string(),
+        };
     }
 
     // equality       → comparison ( ( "!=" | "==" ) comparison )* ;
@@ -182,18 +235,10 @@ impl Parser {
             match &self.previous().literal {
                 Some(token::Literal::Number(v)) => return Ok(Expr::Literal(Literal::Number(*v))),
                 Some(l) => {
-                    return Err(ParseError::Internal {
-                        line: self.previous().line,
-                        message: format!("Expected a number literal, found: {:?}", l),
-                    }
-                    .into())
+                    return Err(self.error(&format!("Expected a number literal, found: {:?}", l)))
                 }
                 None => {
-                    return Err(ParseError::Internal {
-                        line: self.previous().line,
-                        message: "Expected a number literal, but found None".into(),
-                    }
-                    .into())
+                    return Err(self.error("Expected a number literal, but found None"));
                 }
             }
         }
@@ -203,18 +248,10 @@ impl Parser {
                     return Ok(Expr::Literal(Literal::String(v.clone())))
                 }
                 Some(l) => {
-                    return Err(ParseError::Internal {
-                        line: self.previous().line,
-                        message: format!("Expected a string literal, found: {:?}", l),
-                    }
-                    .into())
+                    return Err(self.error(&format!("Expected a string literal, found: {:?}", l)));
                 }
                 None => {
-                    return Err(ParseError::Internal {
-                        line: self.previous().line,
-                        message: "Expected a string literal, but found None".into(),
-                    }
-                    .into())
+                    return Err(self.error("Expected a string literal, but found None"));
                 }
             }
         }
@@ -229,11 +266,7 @@ impl Parser {
             return Ok(Expr::Variable(self.previous().clone()));
         }
 
-        Err(ParseError::Internal {
-            line: self.previous().line,
-            message: "Unexpected token in expression".into(),
-        }
-        .into())
+        return Err(self.error("Unexpected token in expression"));
     }
 
     fn consume(&mut self, typ: &TokenType, msg: &str) -> ParseResult<&Token> {
@@ -241,11 +274,7 @@ impl Parser {
             return Ok(self.advance());
         }
 
-        Err(ParseError::Internal {
-            line: self.previous().line,
-            message: msg.into(),
-        }
-        .into())
+        return Err(self.error(msg));
     }
 
     fn advance(&mut self) -> &Token {

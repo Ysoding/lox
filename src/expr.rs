@@ -5,10 +5,15 @@ declaration    → varDecl
                | statement ;
 
 statement      → exprStmt
-               | printStmt ;
+               | ifStmt
+               | printStmt
+               | block ;
 
 exprStmt       → expression ";" ;
 printStmt      → "print" expression ";" ;
+ifStmt         → "if" "(" expression ")" statement
+               ( "else" statement )? ;
+block          → "{" declaration* "}" ;
 
 expression     → assignment ;
 assignment     → IDENTIFIER "=" assignment | equality ;
@@ -25,11 +30,11 @@ use crate::token::*;
 
 #[derive(Debug, Clone)]
 pub enum Stmt {
-    Block,
+    Block(Vec<Box<Stmt>>),
     Class,
     Expression(Expr),
     Function,
-    If,
+    If(Expr, Box<Stmt>, Option<Box<Stmt>>),
     Print(Expr),
     Return,
     Var(Token, Option<Expr>),
@@ -66,6 +71,7 @@ pub struct AstPrinter;
 
 impl AstPrinter {
     /// Prints an expression by recursively traversing the AST.
+    #[allow(dead_code)]
     pub fn print(&self, expr: &Expr) -> String {
         match expr {
             Expr::Assign(name, value) => {
