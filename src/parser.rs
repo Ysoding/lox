@@ -55,7 +55,7 @@ impl Parser {
             return self.var_declaration();
         }
 
-        return self.statement();
+        self.statement()
     }
 
     fn var_declaration(&mut self) -> ParseResult<Stmt> {
@@ -88,23 +88,23 @@ impl Parser {
             return self.block_statement();
         }
 
-        return self.expression_statement();
+        self.expression_statement()
     }
 
     fn block_statement(&mut self) -> ParseResult<Stmt> {
         let mut statments = vec![];
 
         while !self.check(&TokenType::RightBrace) && !self.is_at_end() {
-            statments.push(Box::new(self.declaration()?));
+            statments.push(self.declaration()?);
         }
 
-        self.consume(&TokenType::RightBrace, "Expect ')' after block.")?;
+        self.consume(&TokenType::RightBrace, "Expect '}' after block.")?;
         Ok(Stmt::Block(statments))
     }
 
     fn expression_statement(&mut self) -> ParseResult<Stmt> {
         let expr = self.expression()?;
-        self.consume(&TokenType::Semicolon, "Expect ';' after value.")?;
+        self.consume(&TokenType::Semicolon, "Expect ';' after expression.")?;
         Ok(Stmt::Expression(expr))
     }
 
@@ -137,24 +137,24 @@ impl Parser {
         let expr = self.equality()?;
 
         if self.match_one(&TokenType::Equal) {
-            // let equals = self.previous().clone();
+            let equals = self.previous().clone();
             let value = self.assignment()?;
 
             if let Expr::Variable(name) = expr {
                 return Ok(Expr::Assign(name, Box::new(value)));
             }
 
-            return Err(self.error("Invalid assignment target."));
+            return Err(self.error(&equals, "Invalid assignment target."));
         }
 
         Ok(expr)
     }
 
-    fn error(&mut self, msg: &str) -> ParseError {
-        return ParseError {
-            token: self.previous().clone(),
+    fn error(&self, token: &Token, msg: &str) -> ParseError {
+        ParseError {
+            token: token.clone(),
             message: msg.to_string(),
-        };
+        }
     }
 
     // equality       → comparison ( ( "!=" | "==" ) comparison )* ;
@@ -216,7 +216,7 @@ impl Parser {
             let right = self.unary()?;
             return Ok(Expr::Unary(operator, Box::new(right)));
         }
-        return self.primary();
+        self.primary()
     }
 
     // primary        → NUMBER | STRING | "true" | "false" | "nil" | "(" expression ")" | IDENTIFIER ;
@@ -234,12 +234,7 @@ impl Parser {
         if self.match_one(&TokenType::Number) {
             match &self.previous().literal {
                 Some(token::Literal::Number(v)) => return Ok(Expr::Literal(Literal::Number(*v))),
-                Some(l) => {
-                    return Err(self.error(&format!("Expected a number literal, found: {:?}", l)))
-                }
-                None => {
-                    return Err(self.error("Expected a number literal, but found None"));
-                }
+                _ => panic!("Expected Number Literal."),
             }
         }
         if self.match_one(&TokenType::String) {
@@ -247,12 +242,7 @@ impl Parser {
                 Some(token::Literal::String(v)) => {
                     return Ok(Expr::Literal(Literal::String(v.clone())))
                 }
-                Some(l) => {
-                    return Err(self.error(&format!("Expected a string literal, found: {:?}", l)));
-                }
-                None => {
-                    return Err(self.error("Expected a string literal, but found None"));
-                }
+                _ => panic!("Expected String Literal."),
             }
         }
 
@@ -266,7 +256,7 @@ impl Parser {
             return Ok(Expr::Variable(self.previous().clone()));
         }
 
-        return Err(self.error("Unexpected token in expression"));
+        Err(self.error(self.peek(), "Expect expression."))
     }
 
     fn consume(&mut self, typ: &TokenType, msg: &str) -> ParseResult<&Token> {
@@ -274,14 +264,14 @@ impl Parser {
             return Ok(self.advance());
         }
 
-        return Err(self.error(msg));
+        Err(self.error(self.peek(), msg))
     }
 
     fn advance(&mut self) -> &Token {
         if !self.is_at_end() {
             self.current += 1;
         }
-        return self.previous();
+        self.previous()
     }
 
     fn match_one(&mut self, typ: &TokenType) -> bool {
@@ -289,14 +279,14 @@ impl Parser {
             self.advance();
             return true;
         }
-        return false;
+        false
     }
 
     fn check(&self, typ: &TokenType) -> bool {
         if self.is_at_end() {
             return false;
         }
-        return self.peek().typ == *typ;
+        self.peek().typ == *typ
     }
 
     fn match_any(&mut self, typs: &[TokenType]) -> bool {
@@ -314,7 +304,7 @@ impl Parser {
 
     fn previous(&self) -> &Token {
         if self.current == 0 {
-            self.tokens.get(0).unwrap()
+            self.tokens.first().unwrap()
         } else {
             self.tokens.get(self.current - 1).unwrap()
         }

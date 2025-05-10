@@ -1,17 +1,16 @@
 use std::{
-    fs,
+    env, fs,
     io::{self, BufRead, Write},
     path::PathBuf,
     process,
 };
 
-use clap::Parser;
-use lox::{run_interpreter, Cli, Interpreter};
+use lox::{run_interpreter, Interpreter};
 
 fn main() {
-    let cli = Cli::parse();
-    if let Some(file) = cli.file {
-        run_file(file);
+    let args: Vec<String> = env::args().collect();
+    if args.len() == 2 {
+        run_file(args.get(1).unwrap().into());
     } else {
         run_prompt();
     }

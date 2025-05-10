@@ -205,7 +205,7 @@ impl<'a> Scanner<'a> {
         self.add_token_literal(
             TokenType::String,
             Some(Literal::String(
-                self.source[self.start..self.current].to_string(),
+                self.source[self.start + 1..self.current - 1].to_string(),
             )),
         );
     }
@@ -217,7 +217,7 @@ impl<'a> Scanner<'a> {
         if *self.peek().unwrap() != ch {
             return false;
         }
-        self.current += 1;
+        self.advance();
         true
     }
 
@@ -243,8 +243,12 @@ impl<'a> Scanner<'a> {
     }
 
     fn advance(&mut self) -> Option<char> {
-        self.current += 1;
-        self.iter.next()
+        if let Some(ch) = self.iter.next() {
+            self.current += ch.len_utf8();
+            Some(ch)
+        } else {
+            None
+        }
     }
 
     fn is_at_end(&self) -> bool {

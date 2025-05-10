@@ -30,7 +30,7 @@ use crate::token::*;
 
 #[derive(Debug, Clone)]
 pub enum Stmt {
-    Block(Vec<Box<Stmt>>),
+    Block(Vec<Stmt>),
     Class,
     Expression(Expr),
     Function,
@@ -71,7 +71,7 @@ pub struct AstPrinter;
 
 impl AstPrinter {
     /// Prints an expression by recursively traversing the AST.
-    #[allow(dead_code)]
+    #[allow(clippy::only_used_in_recursion, unused)]
     pub fn print(&self, expr: &Expr) -> String {
         match expr {
             Expr::Assign(name, value) => {

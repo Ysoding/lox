@@ -87,26 +87,13 @@ impl Neg for Value {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 struct Environment {
     values: HashMap<String, Value>,
     enclosing: Option<Box<Environment>>,
 }
 
-impl Default for Environment {
-    fn default() -> Self {
-        Self {
-            values: Default::default(),
-            enclosing: None,
-        }
-    }
-}
-
 impl Environment {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
     pub fn with_enclosing(enclosing: Box<Environment>) -> Self {
         Self {
             values: HashMap::new(),
@@ -143,10 +130,10 @@ impl Environment {
             return enclosing.assign(name, val);
         }
 
-        return Err(RuntimeError {
+        Err(RuntimeError {
             token: name.clone(),
             message: format!("Undefined variable '{}'.", name.lexeme),
-        });
+        })
     }
 }
 
@@ -249,7 +236,6 @@ impl Interpreter {
             Stmt::Class => todo!(),
             Stmt::Expression(expr) => {
                 let _value = self.evaluate_expr(expr)?;
-                // println!("{}", value);
             }
             Stmt::Function => todo!(),
             Stmt::Print(expr) => {
@@ -282,7 +268,7 @@ impl Interpreter {
 
     fn execute_block(
         &mut self,
-        stmts: &[Box<Stmt>],
+        stmts: &[Stmt],
         block_env: Environment,
     ) -> Result<Value, RuntimeError> {
         let outer_env = self.env.clone();
@@ -305,6 +291,7 @@ impl Interpreter {
         Ok(Value::Nil)
     }
 
+    #[allow(unused)]
     fn evaluate_expr(&mut self, expr: &Expr) -> Result<Value, RuntimeError> {
         match expr {
             Expr::Assign(name, value) => {
@@ -348,14 +335,14 @@ impl Interpreter {
             }
             Expr::Call(expr, token, exprs) => todo!(),
             Expr::Get(expr, token) => todo!(),
-            Expr::Grouping(expr) => self.evaluate_expr(&expr),
+            Expr::Grouping(expr) => self.evaluate_expr(expr),
             Expr::Literal(literal) => Ok(Value::from(literal)),
             Expr::Logical(expr, token, expr1) => todo!(),
             Expr::Set(expr, token, expr1) => todo!(),
             Expr::Super(token, token1) => todo!(),
             Expr::This(token) => todo!(),
             Expr::Unary(operator, right) => {
-                let right_val = self.evaluate_expr(&right)?;
+                let right_val = self.evaluate_expr(right)?;
                 match operator.typ {
                     TokenType::Minus => {
                         self.check_number_operand(operator, &right_val)?;
@@ -374,16 +361,14 @@ impl Interpreter {
 }
 
 pub fn run_interpreter(source_code: &str, interpreter: &mut Interpreter) -> Result<(), LoxError> {
-    print!("{}", source_code);
     let mut scanner = Scanner::new(source_code);
     scanner.scan_tokens();
 
     for token in &scanner.tokens {
         if token.typ == TokenType::Error {
-            eprintln!("[line {}] Error: Unexpected character.", token.line);
+            println!("[line {}] Error: Unexpected character.", token.line);
             return Err(LoxError::CompileError);
         }
-        println!("{}", token);
     }
 
     let mut parser = Parser::new(scanner.tokens);
@@ -399,7 +384,7 @@ pub fn run_interpreter(source_code: &str, interpreter: &mut Interpreter) -> Resu
             }
         }
         Err(e) => {
-            eprintln!("{}", e);
+            println!("{}", e);
             Err(LoxError::CompileError)
         }
     }
