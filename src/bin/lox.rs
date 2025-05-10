@@ -5,6 +5,7 @@ use std::{
     process,
 };
 
+use bumpalo::Bump;
 use lox::{run_interpreter, Interpreter};
 
 fn main() {
@@ -18,8 +19,10 @@ fn main() {
 
 fn run_file(file_path: PathBuf) {
     let source = fs::read_to_string(file_path).expect("Failed to read source file");
+    let bump = Bump::new();
     let mut interp = Interpreter::default();
-    if let Err(error) = run_interpreter(&source, &mut interp) {
+
+    if let Err(error) = run_interpreter(&source, &mut interp, &bump) {
         match error {
             lox::LoxError::CompileError => process::exit(65),
             lox::LoxError::RuntimeError => process::exit(70),
@@ -30,6 +33,7 @@ fn run_file(file_path: PathBuf) {
 fn run_prompt() {
     let mut input = io::stdin().lock();
     let mut output = io::stdout();
+    let mut bump = Bump::new();
     let mut interpreter = Interpreter::default();
 
     loop {
@@ -44,6 +48,7 @@ fn run_prompt() {
         if buffer.is_empty() {
             continue;
         }
-        run_interpreter(&buffer, &mut interpreter).ok();
+        run_interpreter(&buffer, &mut interpreter, &bump).ok();
+        bump.reset();
     }
 }

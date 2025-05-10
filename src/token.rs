@@ -1,31 +1,34 @@
 use core::fmt;
 
 #[derive(Debug, Clone)]
-pub enum Literal {
-    String(String),
-    Number(f64),
+pub struct Token<'a> {
+    pub typ: TokenType,
+    pub lexeme: &'a str,
+    pub line: usize,
+    pub literal: Option<Literal<'a>>,
 }
 
 #[derive(Debug, Clone)]
-pub struct Token {
-    pub typ: TokenType,
-    pub lexeme: String,
-    pub line: usize,
-    pub literal: Option<Literal>,
+pub enum Literal<'a> {
+    Number(f64),
+    String(&'a str),
+    True,
+    False,
+    Nil,
 }
 
-impl Token {
-    pub fn new(typ: TokenType, lexeme: &str, line: usize, literal: Option<Literal>) -> Self {
+impl<'a> Token<'a> {
+    pub fn new(typ: TokenType, lexeme: &'a str, line: usize, literal: Option<Literal<'a>>) -> Self {
         Self {
             typ,
-            lexeme: lexeme.to_string(),
+            lexeme,
             line,
             literal,
         }
     }
 }
 
-impl fmt::Display for Token {
+impl fmt::Display for Token<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,

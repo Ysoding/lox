@@ -29,41 +29,32 @@ operator       → "==" | "!=" | "<" | "<=" | ">" | ">="
 use crate::token::*;
 
 #[derive(Debug, Clone)]
-pub enum Stmt {
-    Block(Vec<Stmt>),
+pub enum Stmt<'a> {
+    Block(bumpalo::collections::Vec<'a, &'a Stmt<'a>>),
     Class,
-    Expression(Expr),
+    Expression(&'a Expr<'a>),
     Function,
-    If(Expr, Box<Stmt>, Option<Box<Stmt>>),
-    Print(Expr),
+    If(&'a Expr<'a>, &'a Stmt<'a>, Option<&'a Stmt<'a>>),
+    Print(&'a Expr<'a>),
     Return,
-    Var(Token, Option<Expr>),
+    Var(&'a Token<'a>, Option<&'a Expr<'a>>),
     While,
 }
 
 #[derive(Debug, Clone)]
-pub enum Expr {
-    Assign(Token, Box<Expr>),
-    Binary(Box<Expr>, Token, Box<Expr>),
-    Call(Box<Expr>, Token, Vec<Expr>),
-    Get(Box<Expr>, Token),
-    Grouping(Box<Expr>),
-    Literal(Literal),
-    Logical(Box<Expr>, Token, Box<Expr>),
-    Set(Box<Expr>, Token, Box<Expr>),
-    Super(Token, Token),
-    This(Token),
-    Unary(Token, Box<Expr>),
-    Variable(Token),
-}
-
-#[derive(Debug, Clone)]
-pub enum Literal {
-    Number(f64),
-    String(String),
-    True,
-    False,
-    Nil,
+pub enum Expr<'a> {
+    Assign(&'a Token<'a>, &'a Expr<'a>),
+    Binary(&'a Expr<'a>, &'a Token<'a>, &'a Expr<'a>),
+    Call(&'a Expr<'a>, &'a Token<'a>, Vec<&'a Expr<'a>>),
+    Get(&'a Expr<'a>, &'a Token<'a>),
+    Grouping(&'a Expr<'a>),
+    Literal(Literal<'a>),
+    Logical(&'a Expr<'a>, &'a Token<'a>, &'a Expr<'a>),
+    Set(&'a Expr<'a>, &'a Token<'a>, &'a Expr<'a>),
+    Super(&'a Token<'a>, &'a Token<'a>),
+    This(&'a Token<'a>),
+    Unary(&'a Token<'a>, &'a Expr<'a>),
+    Variable(&'a Token<'a>),
 }
 
 #[derive(Default)]
@@ -127,15 +118,14 @@ mod tests {
     #[test]
     fn expr() {
         // (* (- 123) (group 45.67))
+        let t = Token::new(TokenType::Minus, "-", 1, None);
+        let left = Expr::Unary(&t, &Expr::Literal(Literal::Number(123.0)));
+
+        let t = Token::new(TokenType::Star, "*", 1, None);
         let expr = Expr::Binary(
-            Box::new(Expr::Unary(
-                Token::new(TokenType::Minus, "-", 1, None),
-                Box::new(Expr::Literal(Literal::Number(123.0))),
-            )),
-            Token::new(TokenType::Star, "*", 1, None),
-            Box::new(Expr::Grouping(Box::new(Expr::Literal(Literal::Number(
-                45.67,
-            ))))),
+            &left,
+            &t,
+            &Expr::Grouping(&Expr::Literal(Literal::Number(45.67))),
         );
         let printer = AstPrinter;
         let output = printer.print(&expr);

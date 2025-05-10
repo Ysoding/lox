@@ -4,24 +4,26 @@ use crate::token::{Literal, Token, TokenType};
 
 #[derive(Debug)]
 pub struct Scanner<'a> {
+    bump: &'a bumpalo::Bump,
     source: &'a str,
     iter: Peekable<Chars<'a>>,
     start: usize,
     current: usize,
     line: usize,
 
-    pub tokens: Vec<Token>,
+    pub tokens: bumpalo::collections::Vec<'a, &'a Token<'a>>,
 }
 
 impl<'a> Scanner<'a> {
-    pub fn new(source: &'a str) -> Self {
+    pub fn new(source: &'a str, bump: &'a bumpalo::Bump) -> Self {
         Self {
             source,
             iter: source.chars().peekable(),
-            tokens: Vec::new(),
+            tokens: bumpalo::collections::Vec::new_in(bump),
             start: 0,
             current: 0,
             line: 1,
+            bump,
         }
     }
 
@@ -31,8 +33,13 @@ impl<'a> Scanner<'a> {
             self.scan_token();
         }
 
-        self.tokens
-            .push(Token::new(TokenType::Eof, "", self.line, None));
+        let token = self.bump.alloc(Token::new(
+            TokenType::Eof,
+            self.bump.alloc_str(""),
+            self.line,
+            None,
+        ));
+        self.tokens.push(token);
     }
 
     fn scan_token(&mut self) {
@@ -105,12 +112,13 @@ impl<'a> Scanner<'a> {
                     } else if ch.is_alphabetic() {
                         self.scan_identifier();
                     } else {
-                        self.tokens.push(Token::new(
+                        let token = self.bump.alloc(Token::new(
                             TokenType::Error,
-                            "Unexpected character.",
+                            self.bump.alloc_str("Unexpected character."),
                             self.line,
                             None,
                         ));
+                        self.tokens.push(token);
                     }
                 }
             }
@@ -190,12 +198,12 @@ impl<'a> Scanner<'a> {
         }
 
         if self.is_at_end() {
-            self.tokens.push(Token::new(
+            self.tokens.push(self.bump.alloc(Token::new(
                 TokenType::Error,
-                "Unterminated string.",
+                self.bump.alloc_str("Unterminated string."),
                 self.line,
                 None,
-            ));
+            )));
             return;
         }
 
@@ -205,7 +213,8 @@ impl<'a> Scanner<'a> {
         self.add_token_literal(
             TokenType::String,
             Some(Literal::String(
-                self.source[self.start + 1..self.current - 1].to_string(),
+                self.bump
+                    .alloc_str(&self.source[self.start + 1..self.current - 1]),
             )),
         );
     }
@@ -225,13 +234,13 @@ impl<'a> Scanner<'a> {
         self.add_token_literal(typ, None);
     }
 
-    fn add_token_literal(&mut self, typ: TokenType, literal: Option<Literal>) {
-        self.tokens.push(Token::new(
+    fn add_token_literal(&mut self, typ: TokenType, literal: Option<Literal<'a>>) {
+        self.tokens.push(self.bump.alloc(Token::new(
             typ,
-            &self.source[self.start..self.current],
+            self.bump.alloc(&self.source[self.start..self.current]),
             self.line,
             literal,
-        ));
+        )));
     }
 
     fn peek(&mut self) -> Option<&char> {

@@ -1,16 +1,17 @@
 use std::collections::HashMap;
-use std::fmt;
+use std::fmt::{self};
 use std::ops::Neg;
 
 use anyhow::Result;
+use bumpalo::{collections::Vec as BVec, Bump};
 
-use crate::expr::{self, Expr, Stmt};
+use crate::expr::{Expr, Stmt};
 use crate::token::{Token, TokenType};
-use crate::{LoxError, Parser, Scanner};
+use crate::{Literal, LoxError, Parser, Scanner};
 
 #[derive(Debug, Clone)]
-pub struct RuntimeError {
-    pub token: Token,
+pub struct RuntimeError<'a> {
+    pub token: &'a Token<'a>,
     pub message: String,
 }
 
@@ -44,34 +45,40 @@ impl Value {
     }
 }
 
-impl From<&expr::Literal> for Value {
-    fn from(value: &expr::Literal) -> Self {
+impl<'a> From<&Literal<'a>> for Value {
+    fn from(value: &Literal<'a>) -> Self {
         match value {
-            expr::Literal::Number(v) => Value::Number(*v),
-            expr::Literal::String(v) => Value::String(v.clone()),
-            expr::Literal::True => Value::Boolean(true),
-            expr::Literal::False => Value::Boolean(false),
-            expr::Literal::Nil => Value::Nil,
+            Literal::Number(v) => Value::Number(*v),
+            Literal::String(v) => Value::String(v.to_string()),
+            Literal::True => Value::Boolean(true),
+            Literal::False => Value::Boolean(false),
+            Literal::Nil => Value::Nil,
         }
     }
 }
 
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let v = match self {
+        match self {
             Value::Number(n) => {
                 let text = n.to_string();
                 if text.ends_with(".0") {
-                    text[..text.len() - 2].to_string()
+                    f.write_str(&text[..text.len() - 2])?;
                 } else {
-                    text
+                    f.write_str(&text)?;
                 }
             }
-            Value::String(s) => s.clone(),
-            Value::Boolean(b) => b.to_string(),
-            Value::Nil => "nil".to_string(),
+            Value::String(s) => {
+                f.write_str(s)?;
+            }
+            Value::Boolean(b) => {
+                f.write_str(&b.to_string())?;
+            }
+            Value::Nil => {
+                f.write_str("nil")?;
+            }
         };
-        f.write_str(&v)
+        Ok(())
     }
 }
 
@@ -94,10 +101,10 @@ struct Environment {
 }
 
 impl Environment {
-    pub fn with_enclosing(enclosing: Box<Environment>) -> Self {
+    pub fn with_enclosing(enclosing: &Environment) -> Self {
         Self {
             values: HashMap::new(),
-            enclosing: Some(enclosing),
+            enclosing: Some(Box::new(enclosing.clone())),
         }
     }
 
@@ -105,24 +112,21 @@ impl Environment {
         self.values.insert(name.to_string(), value);
     }
 
-    pub fn get(&self, name: &Token) -> Result<Value, RuntimeError> {
-        if self.values.contains_key(&name.lexeme) {
-            return Ok(self.values.get(&name.lexeme).unwrap().clone());
+    pub fn get(&self, name: &str) -> Result<Value, String> {
+        if self.values.contains_key(name) {
+            return Ok(self.values.get(name).unwrap().clone());
         }
 
         if let Some(enclosing) = &self.enclosing {
             return enclosing.get(name);
         }
 
-        Err(RuntimeError {
-            token: name.clone(),
-            message: format!("Undefined variable '{}'.", name.lexeme),
-        })
+        Err(format!("Undefined variable '{}'.", name))
     }
 
-    pub fn assign(&mut self, name: &Token, val: Value) -> Result<(), RuntimeError> {
-        if self.values.contains_key(&name.lexeme) {
-            self.values.insert(name.lexeme.to_string(), val);
+    pub fn assign(&mut self, name: &str, val: Value) -> Result<(), String> {
+        if self.values.contains_key(name) {
+            self.values.insert(name.to_string(), val);
             return Ok(());
         }
 
@@ -130,10 +134,7 @@ impl Environment {
             return enclosing.assign(name, val);
         }
 
-        Err(RuntimeError {
-            token: name.clone(),
-            message: format!("Undefined variable '{}'.", name.lexeme),
-        })
+        Err(format!("Undefined variable '{}'.", name))
     }
 }
 
@@ -143,95 +144,104 @@ pub struct Interpreter {
 }
 
 impl Interpreter {
-    pub fn interpret(&mut self, stmts: Vec<Stmt>) -> Result<(), RuntimeError> {
-        for stmt in &stmts {
+    pub fn interpret<'a>(&mut self, stmts: BVec<'a, &'a Stmt<'a>>) -> Result<(), RuntimeError<'a>> {
+        for stmt in stmts {
             self.execute_stmt(stmt)?;
         }
         Ok(())
     }
 
-    fn check_number_operand(&self, token: &Token, operand: &Value) -> Result<(), RuntimeError> {
+    fn check_number_operand<'b>(
+        &self,
+        token: &'b Token<'b>,
+        operand: &Value,
+    ) -> Result<(), RuntimeError<'b>> {
         if let Value::Number(_) = operand {
             Ok(())
         } else {
             Err(RuntimeError {
-                token: token.clone(),
+                token,
                 message: "Operand must be a number.".to_string(),
             })
         }
     }
 
-    fn check_number_operands(
+    fn check_number_operands<'b>(
         &self,
-        token: &Token,
+        token: &'b Token<'b>,
         left: &Value,
         right: &Value,
-    ) -> Result<(), RuntimeError> {
+    ) -> Result<(), RuntimeError<'b>> {
         if let (Value::Number(_), Value::Number(_)) = (left, right) {
             Ok(())
         } else {
             Err(RuntimeError {
-                token: token.clone(),
+                token,
                 message: "Operands must be numbers.".to_string(),
             })
         }
     }
 
-    fn binary_op<F>(
+    fn binary_op<'b, F>(
         &self,
-        token: &Token,
-        a: &Value,
-        b: &Value,
+        token: &'b Token<'b>,
+        a: Value,
+        b: Value,
         op: F,
-    ) -> Result<Value, RuntimeError>
+    ) -> Result<Value, RuntimeError<'b>>
     where
         F: Fn(f64, f64) -> f64,
     {
-        self.check_number_operands(token, a, b)?;
+        self.check_number_operands(token, &a, &b)?;
         if let (Value::Number(a_val), Value::Number(b_val)) = (a, b) {
-            Ok(Value::Number(op(*a_val, *b_val)))
+            Ok(Value::Number(op(a_val, b_val)))
         } else {
             // This should be unreachable due to the check above
             Err(RuntimeError {
-                token: token.clone(),
+                token,
                 message: "Operands must be numbers.".to_string(),
             })
         }
     }
 
-    fn comparison_op<F>(
+    fn comparison_op<'b, F>(
         &self,
-        token: &Token,
-        a: &Value,
-        b: &Value,
+        token: &'b Token<'b>,
+        a: Value,
+        b: Value,
         op: F,
-    ) -> Result<Value, RuntimeError>
+    ) -> Result<Value, RuntimeError<'b>>
     where
         F: Fn(f64, f64) -> bool,
     {
-        self.check_number_operands(token, a, b)?;
+        self.check_number_operands(token, &a, &b)?;
         if let (Value::Number(a_val), Value::Number(b_val)) = (a, b) {
-            Ok(Value::Boolean(op(*a_val, *b_val)))
+            Ok(Value::Boolean(op(a_val, b_val)))
         } else {
             Err(RuntimeError {
-                token: token.clone(),
+                token,
                 message: "Operands must be numbers.".to_string(),
             })
         }
     }
 
-    fn handle_plus(&self, token: &Token, a: &Value, b: &Value) -> Result<Value, RuntimeError> {
+    fn handle_plus<'b>(
+        &self,
+        token: &'b Token<'b>,
+        a: Value,
+        b: Value,
+    ) -> Result<Value, RuntimeError<'b>> {
         match (a, b) {
             (Value::Number(n1), Value::Number(n2)) => Ok(Value::Number(n1 + n2)),
             (Value::String(s1), Value::String(s2)) => Ok(Value::String(format!("{}{}", s1, s2))),
             _ => Err(RuntimeError {
-                token: token.clone(),
+                token,
                 message: "Operands must be two numbers or two strings.".to_string(),
             }),
         }
     }
 
-    fn execute_stmt(&mut self, stmt: &Stmt) -> Result<(), RuntimeError> {
+    fn execute_stmt<'a>(&mut self, stmt: &'a Stmt<'a>) -> Result<(), RuntimeError<'a>> {
         match stmt {
             Stmt::Class => todo!(),
             Stmt::Expression(expr) => {
@@ -249,7 +259,7 @@ impl Interpreter {
                     Some(v) => self.evaluate_expr(v)?,
                     None => Value::Nil,
                 };
-                self.env.define(&name.lexeme, value);
+                self.env.define(name.lexeme, value);
             }
             Stmt::If(condition, then_stmt, else_stmt) => {
                 if self.evaluate_expr(condition)?.is_truthy() {
@@ -259,21 +269,21 @@ impl Interpreter {
                 }
             }
             Stmt::Block(stmts) => {
-                let block_env = Environment::with_enclosing(Box::new(self.env.clone()));
+                let block_env = Environment::with_enclosing(&self.env);
                 self.execute_block(stmts, block_env)?;
             }
         }
         Ok(())
     }
 
-    fn execute_block(
+    fn execute_block<'a>(
         &mut self,
-        stmts: &[Stmt],
+        stmts: &'a [&Stmt<'a>],
         block_env: Environment,
-    ) -> Result<Value, RuntimeError> {
-        let outer_env = self.env.clone();
+    ) -> Result<Value, RuntimeError<'a>> {
+        let previous = self.env.clone();
 
-        self.env = block_env.clone();
+        self.env = block_env;
 
         let mut err = None;
         for stmt in stmts {
@@ -283,7 +293,7 @@ impl Interpreter {
             }
         }
 
-        self.env = outer_env;
+        self.env = previous;
         if let Some(e) = err {
             return Err(e);
         }
@@ -292,43 +302,42 @@ impl Interpreter {
     }
 
     #[allow(unused)]
-    fn evaluate_expr(&mut self, expr: &Expr) -> Result<Value, RuntimeError> {
+    fn evaluate_expr<'a>(&mut self, expr: &'a Expr<'a>) -> Result<Value, RuntimeError<'a>> {
         match expr {
-            Expr::Assign(name, value) => {
+            Expr::Assign(token, value) => {
                 let val = self.evaluate_expr(value)?;
-                self.env.assign(name, val.clone())?;
-                Ok(val)
+                match self.env.assign(token.lexeme, val.clone()) {
+                    Ok(_) => Ok(val),
+                    Err(msg) => Err(RuntimeError {
+                        token,
+                        message: msg,
+                    }),
+                }
             }
             Expr::Binary(left, operator, right) => {
                 let left_val = self.evaluate_expr(left)?;
                 let right_val = self.evaluate_expr(right)?;
                 match operator.typ {
-                    TokenType::Plus => self.handle_plus(operator, &left_val, &right_val),
-                    TokenType::Minus => {
-                        self.binary_op(operator, &left_val, &right_val, |a, b| a - b)
-                    }
-                    TokenType::Slash => {
-                        self.binary_op(operator, &left_val, &right_val, |a, b| a / b)
-                    }
-                    TokenType::Star => {
-                        self.binary_op(operator, &left_val, &right_val, |a, b| a * b)
-                    }
+                    TokenType::Plus => self.handle_plus(operator, left_val, right_val),
+                    TokenType::Minus => self.binary_op(operator, left_val, right_val, |a, b| a - b),
+                    TokenType::Slash => self.binary_op(operator, left_val, right_val, |a, b| a / b),
+                    TokenType::Star => self.binary_op(operator, left_val, right_val, |a, b| a * b),
                     TokenType::Greater => {
-                        self.comparison_op(operator, &left_val, &right_val, |a, b| a > b)
+                        self.comparison_op(operator, left_val, right_val, |a, b| a > b)
                     }
                     TokenType::GreaterEqual => {
-                        self.comparison_op(operator, &left_val, &right_val, |a, b| a >= b)
+                        self.comparison_op(operator, left_val, right_val, |a, b| a >= b)
                     }
                     TokenType::Less => {
-                        self.comparison_op(operator, &left_val, &right_val, |a, b| a < b)
+                        self.comparison_op(operator, left_val, right_val, |a, b| a < b)
                     }
                     TokenType::LessEqual => {
-                        self.comparison_op(operator, &left_val, &right_val, |a, b| a <= b)
+                        self.comparison_op(operator, left_val, right_val, |a, b| a <= b)
                     }
                     TokenType::BangEqual => Ok(Value::Boolean(!left_val.is_equal(&right_val))),
                     TokenType::EqualEqual => Ok(Value::Boolean(left_val.is_equal(&right_val))),
                     _ => Err(RuntimeError {
-                        token: operator.clone(),
+                        token: operator,
                         message: "Unsupported operator.".to_string(),
                     }),
                 }
@@ -350,18 +359,29 @@ impl Interpreter {
                     }
                     TokenType::Bang => Ok(Value::Boolean(!right_val.is_truthy())),
                     _ => Err(RuntimeError {
-                        token: operator.clone(),
+                        token: operator,
                         message: "Unsupported unary operator.".to_string(),
                     }),
                 }
             }
-            Expr::Variable(name) => self.env.get(name),
+            Expr::Variable(token) => match self.env.get(token.lexeme) {
+                Ok(v) => Ok(v),
+                Err(msg) => Err(RuntimeError {
+                    token,
+                    message: msg,
+                }),
+            },
         }
     }
 }
 
-pub fn run_interpreter(source_code: &str, interpreter: &mut Interpreter) -> Result<(), LoxError> {
-    let mut scanner = Scanner::new(source_code);
+pub fn run_interpreter<'a>(
+    source_code: &'a str,
+    interpreter: &mut Interpreter,
+    bump: &'a Bump,
+) -> Result<(), LoxError> {
+    let mut scanner = Scanner::new(source_code, bump);
+
     scanner.scan_tokens();
 
     for token in &scanner.tokens {
@@ -371,7 +391,7 @@ pub fn run_interpreter(source_code: &str, interpreter: &mut Interpreter) -> Resu
         }
     }
 
-    let mut parser = Parser::new(scanner.tokens);
+    let parser = Parser::new(&scanner.tokens, bump);
     match parser.parse() {
         Ok(stmts) => {
             let res = interpreter.interpret(stmts);
