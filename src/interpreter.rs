@@ -9,7 +9,7 @@ use crate::expr::{Expr, Stmt};
 use crate::token::{Token, TokenType};
 use crate::{Literal, LoxError, Parser, Scanner};
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct RuntimeError<'a> {
     pub token: &'a Token<'a>,
     pub message: String,

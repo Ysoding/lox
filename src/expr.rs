@@ -28,7 +28,7 @@ operator       → "==" | "!=" | "<" | "<=" | ">" | ">="
 
 use crate::token::*;
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum Stmt<'a> {
     Block(bumpalo::collections::Vec<'a, &'a Stmt<'a>>),
     Class,
@@ -41,7 +41,7 @@ pub enum Stmt<'a> {
     While,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum Expr<'a> {
     Assign(&'a Token<'a>, &'a Expr<'a>),
     Binary(&'a Expr<'a>, &'a Token<'a>, &'a Expr<'a>),
