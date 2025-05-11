@@ -9,6 +9,7 @@ statement      → exprStmt
                | printStmt
                | whileStmt
                | forStmt
+               | breakStmt
                | block ;
 
 exprStmt       → expression ";" ;
@@ -20,6 +21,9 @@ whileStmt      → "while" "(" expression ")" statement ;
 forStmt        → "for" "(" ( varDecl | exprStmt | ";" )
                  expression? ";"
                  expression? ")" statement ;
+breakStmt      → "break";
+
+expression     → assignment ;
 
 expression     → assignment ;
 assignment     → IDENTIFIER "=" assignment
@@ -53,6 +57,7 @@ pub enum Stmt<'a> {
     Return,
     Var(&'a Token<'a>, Option<&'a Expr<'a>>),
     While(&'a Expr<'a>, &'a Stmt<'a>),
+    Break(&'a Token<'a>),
 }
 
 #[derive(Debug)]

@@ -11,10 +11,37 @@ use crate::expr::{Expr, Stmt};
 use crate::token::{Token, TokenType};
 use crate::{Literal, LoxError, Parser, Scanner};
 
+type InterpretResult<'a, T> = Result<T, InterpretError<'a>>;
+
+#[derive(Debug)]
+pub enum InterpretError<'a> {
+    Runtime(RuntimeError<'a>),
+    Break(Break<'a>),
+}
+
+impl<'a> From<RuntimeError<'a>> for InterpretError<'a> {
+    fn from(err: RuntimeError<'a>) -> Self {
+        InterpretError::Runtime(err)
+    }
+}
+#[derive(Debug)]
+pub struct Break<'a> {
+    token: &'a Token<'a>,
+}
+
 #[derive(Debug)]
 pub struct RuntimeError<'a> {
     pub token: &'a Token<'a>,
     pub message: String,
+}
+
+impl<'a> From<InterpretError<'a>> for RuntimeError<'a> {
+    fn from(value: InterpretError<'a>) -> Self {
+        match value {
+            InterpretError::Runtime(runtime_error) => runtime_error,
+            _ => panic!("Cannot convert to RuntimeError"),
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -148,7 +175,16 @@ pub struct Interpreter {
 impl Interpreter {
     pub fn interpret<'a>(&mut self, stmts: BVec<'a, &'a Stmt<'a>>) -> Result<(), RuntimeError<'a>> {
         for stmt in stmts {
-            self.execute_stmt(stmt)?;
+            match self.execute_stmt(stmt) {
+                Ok(()) => {}
+                Err(InterpretError::Break(b)) => {
+                    return Err(RuntimeError {
+                        token: b.token,
+                        message: "Break statement must be inside a loop.".to_string(),
+                    })
+                }
+                Err(e) => return Err(e.into()),
+            }
         }
         Ok(())
     }
@@ -157,14 +193,15 @@ impl Interpreter {
         &self,
         token: &'b Token<'b>,
         operand: &Value,
-    ) -> Result<(), RuntimeError<'b>> {
+    ) -> InterpretResult<'b, ()> {
         if let Value::Number(_) = operand {
             Ok(())
         } else {
             Err(RuntimeError {
                 token,
                 message: "Operand must be a number.".to_string(),
-            })
+            }
+            .into())
         }
     }
 
@@ -173,14 +210,15 @@ impl Interpreter {
         token: &'b Token<'b>,
         left: &Value,
         right: &Value,
-    ) -> Result<(), RuntimeError<'b>> {
+    ) -> InterpretResult<'b, ()> {
         if let (Value::Number(_), Value::Number(_)) = (left, right) {
             Ok(())
         } else {
             Err(RuntimeError {
                 token,
                 message: "Operands must be numbers.".to_string(),
-            })
+            }
+            .into())
         }
     }
 
@@ -190,7 +228,7 @@ impl Interpreter {
         a: Value,
         b: Value,
         op: F,
-    ) -> Result<Value, RuntimeError<'b>>
+    ) -> InterpretResult<'b, Value>
     where
         F: Fn(f64, f64) -> f64,
     {
@@ -202,7 +240,8 @@ impl Interpreter {
             Err(RuntimeError {
                 token,
                 message: "Operands must be numbers.".to_string(),
-            })
+            }
+            .into())
         }
     }
 
@@ -212,7 +251,7 @@ impl Interpreter {
         a: Value,
         b: Value,
         op: F,
-    ) -> Result<Value, RuntimeError<'b>>
+    ) -> InterpretResult<'b, Value>
     where
         F: Fn(f64, f64) -> bool,
     {
@@ -223,7 +262,8 @@ impl Interpreter {
             Err(RuntimeError {
                 token,
                 message: "Operands must be numbers.".to_string(),
-            })
+            }
+            .into())
         }
     }
 
@@ -232,18 +272,19 @@ impl Interpreter {
         token: &'b Token<'b>,
         a: Value,
         b: Value,
-    ) -> Result<Value, RuntimeError<'b>> {
+    ) -> InterpretResult<'b, Value> {
         match (a, b) {
             (Value::Number(n1), Value::Number(n2)) => Ok(Value::Number(n1 + n2)),
             (Value::String(s1), Value::String(s2)) => Ok(Value::String(format!("{}{}", s1, s2))),
             _ => Err(RuntimeError {
                 token,
                 message: "Operands must be two numbers or two strings.".to_string(),
-            }),
+            }
+            .into()),
         }
     }
 
-    fn execute_stmt<'a>(&mut self, stmt: &'a Stmt<'a>) -> Result<(), RuntimeError<'a>> {
+    fn execute_stmt<'a>(&mut self, stmt: &'a Stmt<'a>) -> InterpretResult<'a, ()> {
         match stmt {
             Stmt::Class => todo!(),
             Stmt::Expression(expr) => {
@@ -275,8 +316,15 @@ impl Interpreter {
             }
             Stmt::While(condition, body) => {
                 while self.evaluate_expr(condition)?.is_truthy() {
-                    self.execute_stmt(body)?;
+                    match self.execute_stmt(body) {
+                        Ok(()) => {}
+                        Err(InterpretError::Break(_)) => break,
+                        Err(e) => return Err(e),
+                    };
                 }
+            }
+            Stmt::Break(token) => {
+                return Err(InterpretError::Break(Break { token }));
             }
         }
         Ok(())
@@ -286,29 +334,28 @@ impl Interpreter {
         &mut self,
         stmts: &'a [&Stmt<'a>],
         block_env: Environment,
-    ) -> Result<Value, RuntimeError<'a>> {
+    ) -> InterpretResult<'a, Value> {
         let previous = Rc::clone(&self.env);
 
         self.env = Rc::new(RefCell::new(block_env));
 
-        let mut err = None;
+        let mut result = Ok(Value::Nil);
         for stmt in stmts {
-            if let Err(e) = self.execute_stmt(stmt) {
-                err = Some(e);
-                break;
+            match self.execute_stmt(stmt) {
+                Ok(()) => {}
+                Err(e) => {
+                    result = Err(e);
+                    break;
+                }
             }
         }
 
         self.env = previous;
-        if let Some(e) = err {
-            return Err(e);
-        }
-
-        Ok(Value::Nil)
+        result
     }
 
     #[allow(unused)]
-    fn evaluate_expr<'a>(&mut self, expr: &'a Expr<'a>) -> Result<Value, RuntimeError<'a>> {
+    fn evaluate_expr<'a>(&mut self, expr: &'a Expr<'a>) -> InterpretResult<'a, Value> {
         match expr {
             Expr::Assign(token, value) => {
                 let val = self.evaluate_expr(value)?;
@@ -317,7 +364,8 @@ impl Interpreter {
                     Err(msg) => Err(RuntimeError {
                         token,
                         message: msg,
-                    }),
+                    }
+                    .into()),
                 }
             }
             Expr::Binary(left, operator, right) => {
@@ -345,7 +393,8 @@ impl Interpreter {
                     _ => Err(RuntimeError {
                         token: operator,
                         message: "Unsupported operator.".to_string(),
-                    }),
+                    }
+                    .into()),
                 }
             }
             Expr::Call(expr, token, exprs) => todo!(),
@@ -384,7 +433,8 @@ impl Interpreter {
                     _ => Err(RuntimeError {
                         token: operator,
                         message: "Unsupported unary operator.".to_string(),
-                    }),
+                    }
+                    .into()),
                 }
             }
             Expr::Variable(token) => match self.env.borrow().get(token.lexeme) {
@@ -392,7 +442,8 @@ impl Interpreter {
                 Err(msg) => Err(RuntimeError {
                     token,
                     message: msg,
-                }),
+                }
+                .into()),
             },
         }
     }

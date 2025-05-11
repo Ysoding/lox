@@ -84,6 +84,10 @@ impl<'a> Parser<'a> {
     }
 
     fn statement(&self) -> ParseResult<&'a Stmt<'a>> {
+        if self.match_one(&TokenType::Break) {
+            return self.break_statement();
+        }
+
         if self.match_one(&TokenType::For) {
             return self.for_statement();
         }
@@ -105,6 +109,12 @@ impl<'a> Parser<'a> {
         }
 
         self.expression_statement()
+    }
+
+    fn break_statement(&self) -> ParseResult<&'a Stmt<'a>> {
+        let break_token = self.previous();
+        self.consume(&TokenType::Semicolon, "Expect ';' after 'break'.")?;
+        Ok(self.bump.alloc(Stmt::Break(break_token)))
     }
 
     fn for_statement(&self) -> ParseResult<&'a Stmt<'a>> {

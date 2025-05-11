@@ -198,6 +198,7 @@ impl<'a> Scanner<'a> {
         }
 
         let t = match &self.source[self.start..self.current] {
+            "break" => TokenType::Break,
             "and" => TokenType::And,
             "class" => TokenType::Class,
             "else" => TokenType::Else,
