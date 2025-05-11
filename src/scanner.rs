@@ -89,11 +89,44 @@ impl<'a> Scanner<'a> {
                 }
                 '/' => {
                     if self._match('/') {
+                        // //
                         while let Some(ch) = self.peek() {
                             if *ch == '\n' {
                                 break;
                             }
                             self.advance();
+                        }
+                    } else if self._match('*') {
+                        // /* */
+                        let mut nesting_level = 1;
+                        while nesting_level > 0 {
+                            if self.is_at_end() {
+                                let token = self.bump.alloc(Token::new(
+                                    TokenType::Error,
+                                    self.bump.alloc_str("Unterminated block comment."),
+                                    self.line,
+                                    None,
+                                ));
+                                self.tokens.push(token);
+                                return;
+                            }
+
+                            match self.advance() {
+                                Some('/') => {
+                                    if self._match('*') {
+                                        nesting_level += 1;
+                                    }
+                                }
+                                Some('*') => {
+                                    if self._match('/') {
+                                        nesting_level -= 1;
+                                    }
+                                }
+                                Some('\n') => {
+                                    self.line += 1;
+                                }
+                                _ => {}
+                            }
                         }
                     } else {
                         self.add_token(TokenType::Slash);
