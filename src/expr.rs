@@ -7,6 +7,8 @@ declaration    → varDecl
 statement      → exprStmt
                | ifStmt
                | printStmt
+               | whileStmt
+               | forStmt
                | block ;
 
 exprStmt       → expression ";" ;
@@ -14,16 +16,28 @@ printStmt      → "print" expression ";" ;
 ifStmt         → "if" "(" expression ")" statement
                ( "else" statement )? ;
 block          → "{" declaration* "}" ;
+whileStmt      → "while" "(" expression ")" statement ;
+forStmt        → "for" "(" ( varDecl | exprStmt | ";" )
+                 expression? ";"
+                 expression? ")" statement ;
 
 expression     → assignment ;
-assignment     → IDENTIFIER "=" assignment | equality ;
+assignment     → IDENTIFIER "=" assignment
+               | logic_or ;
 
+logic_or       → logic_and ( "or" logic_and )* ;
+logic_and      → equality ( "and" equality )* ;
+
+
+comparison     → term ( ( ">" | ">=" | "<" | "<=" ) term )* ;
+equality       → comparison ( ( "!=" | "==" ) comparison )* ;
 literal        → NUMBER | STRING | "true" | "false" | "nil" ;
 grouping       → "(" expression ")" ;
 unary          → ( "-" | "!" ) expression ;
 binary         → expression operator expression ;
 operator       → "==" | "!=" | "<" | "<=" | ">" | ">="
                | "+"  | "-"  | "*" | "/" ;
+primary        → NUMBER | STRING | "true" | "false" | "nil" | "(" expression ")" | IDENTIFIER ;
 */
 
 use crate::token::*;
@@ -38,7 +52,7 @@ pub enum Stmt<'a> {
     Print(&'a Expr<'a>),
     Return,
     Var(&'a Token<'a>, Option<&'a Expr<'a>>),
-    While,
+    While(&'a Expr<'a>, &'a Stmt<'a>),
 }
 
 #[derive(Debug)]

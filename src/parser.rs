@@ -84,6 +84,10 @@ impl<'a> Parser<'a> {
     }
 
     fn statement(&self) -> ParseResult<&'a Stmt<'a>> {
+        if self.match_one(&TokenType::For) {
+            return self.for_statement();
+        }
+
         if self.match_one(&TokenType::If) {
             return self.if_statement();
         }
@@ -92,11 +96,78 @@ impl<'a> Parser<'a> {
             return self.print_statement();
         }
 
+        if self.match_one(&TokenType::While) {
+            return self.while_statement();
+        }
+
         if self.match_one(&TokenType::LeftBrace) {
             return self.block_statement();
         }
 
         self.expression_statement()
+    }
+
+    fn for_statement(&self) -> ParseResult<&'a Stmt<'a>> {
+        self.consume(&TokenType::LeftParen, "Expect '(' after 'for'.")?;
+
+        let initializer = if self.match_one(&TokenType::Semicolon) {
+            None
+        } else if self.match_one(&TokenType::Var) {
+            Some(self.var_declaration()?)
+        } else {
+            Some(self.expression_statement()?)
+        };
+
+        let mut condition = if !self.check(&TokenType::Semicolon) {
+            Some(self.expression()?)
+        } else {
+            None
+        };
+        self.consume(&TokenType::Semicolon, "Expect ';' after loop condition.")?;
+
+        let increment = if !self.check(&TokenType::RightParen) {
+            Some(self.expression()?)
+        } else {
+            None
+        };
+
+        self.consume(&TokenType::RightParen, "Expect ')' after for clauses.")?;
+
+        let mut body = self.statement()?;
+
+        if let Some(incr) = increment {
+            let mut v = BVec::new_in(self.bump);
+            v.push(body);
+            v.push(self.bump.alloc(Stmt::Expression(incr)));
+
+            body = self.bump.alloc(Stmt::Block(v))
+        }
+
+        if condition.is_none() {
+            condition = Some(self.bump.alloc(Expr::Literal(Literal::True)));
+        }
+
+        body = self.bump.alloc(Stmt::While(condition.unwrap(), body));
+
+        if let Some(init) = initializer {
+            let mut v = BVec::new_in(self.bump);
+            v.push(init);
+            v.push(body);
+
+            body = self.bump.alloc(Stmt::Block(v))
+        }
+
+        Ok(body)
+    }
+
+    fn while_statement(&self) -> ParseResult<&'a Stmt<'a>> {
+        self.consume(&TokenType::LeftParen, "Expect '(' after 'while'.")?;
+        let condition = self.expression()?;
+
+        self.consume(&TokenType::RightParen, "Expect ')' after condition.")?;
+        let body = self.statement()?;
+
+        Ok(self.bump.alloc(Stmt::While(condition, body)))
     }
 
     fn block_statement(&self) -> ParseResult<&'a Stmt<'a>> {
@@ -144,7 +215,7 @@ impl<'a> Parser<'a> {
     }
 
     fn assignment(&self) -> ParseResult<&'a Expr<'a>> {
-        let expr = self.equality()?;
+        let expr = self.or()?;
 
         if self.match_one(&TokenType::Equal) {
             let equals = self.previous();
@@ -155,6 +226,30 @@ impl<'a> Parser<'a> {
             }
 
             return Err(self.error(equals, "Invalid assignment target."));
+        }
+
+        Ok(expr)
+    }
+
+    fn or(&self) -> ParseResult<&'a Expr<'a>> {
+        let mut expr = self.and()?;
+
+        while self.match_one(&TokenType::Or) {
+            let operator = self.previous();
+            let right = self.and()?;
+            expr = self.bump.alloc(Expr::Logical(expr, operator, right));
+        }
+
+        Ok(expr)
+    }
+
+    fn and(&self) -> ParseResult<&'a Expr<'a>> {
+        let mut expr = self.equality()?;
+
+        while self.match_one(&TokenType::And) {
+            let operator = self.previous();
+            let right = self.equality()?;
+            expr = self.bump.alloc(Expr::Logical(expr, operator, right));
         }
 
         Ok(expr)

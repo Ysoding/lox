@@ -1,6 +1,8 @@
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt::{self};
 use std::ops::Neg;
+use std::rc::Rc;
 
 use anyhow::Result;
 use bumpalo::{collections::Vec as BVec, Bump};
@@ -94,17 +96,17 @@ impl Neg for Value {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Default)]
 struct Environment {
     values: HashMap<String, Value>,
-    enclosing: Option<Box<Environment>>,
+    enclosing: Option<Rc<RefCell<Environment>>>,
 }
 
 impl Environment {
-    pub fn with_enclosing(enclosing: &Environment) -> Self {
+    pub fn with_enclosing(enclosing: Rc<RefCell<Environment>>) -> Self {
         Self {
             values: HashMap::new(),
-            enclosing: Some(Box::new(enclosing.clone())),
+            enclosing: Some(enclosing),
         }
     }
 
@@ -118,7 +120,7 @@ impl Environment {
         }
 
         if let Some(enclosing) = &self.enclosing {
-            return enclosing.get(name);
+            return enclosing.borrow().get(name);
         }
 
         Err(format!("Undefined variable '{}'.", name))
@@ -130,8 +132,8 @@ impl Environment {
             return Ok(());
         }
 
-        if let Some(enclosing) = &mut self.enclosing {
-            return enclosing.assign(name, val);
+        if let Some(enclosing) = &self.enclosing {
+            return enclosing.borrow_mut().assign(name, val);
         }
 
         Err(format!("Undefined variable '{}'.", name))
@@ -140,7 +142,7 @@ impl Environment {
 
 #[derive(Default)]
 pub struct Interpreter {
-    env: Environment,
+    env: Rc<RefCell<Environment>>,
 }
 
 impl Interpreter {
@@ -253,13 +255,12 @@ impl Interpreter {
                 println!("{}", value);
             }
             Stmt::Return => todo!(),
-            Stmt::While => todo!(),
-            Stmt::Var(name, initializer) => {
+            Stmt::Var(token, initializer) => {
                 let value = match initializer {
                     Some(v) => self.evaluate_expr(v)?,
                     None => Value::Nil,
                 };
-                self.env.define(name.lexeme, value);
+                self.env.borrow_mut().define(token.lexeme, value);
             }
             Stmt::If(condition, then_stmt, else_stmt) => {
                 if self.evaluate_expr(condition)?.is_truthy() {
@@ -269,8 +270,13 @@ impl Interpreter {
                 }
             }
             Stmt::Block(stmts) => {
-                let block_env = Environment::with_enclosing(&self.env);
+                let block_env = Environment::with_enclosing(Rc::clone(&self.env));
                 self.execute_block(stmts, block_env)?;
+            }
+            Stmt::While(condition, body) => {
+                while self.evaluate_expr(condition)?.is_truthy() {
+                    self.execute_stmt(body)?;
+                }
             }
         }
         Ok(())
@@ -281,9 +287,9 @@ impl Interpreter {
         stmts: &'a [&Stmt<'a>],
         block_env: Environment,
     ) -> Result<Value, RuntimeError<'a>> {
-        let previous = self.env.clone();
+        let previous = Rc::clone(&self.env);
 
-        self.env = block_env;
+        self.env = Rc::new(RefCell::new(block_env));
 
         let mut err = None;
         for stmt in stmts {
@@ -306,7 +312,7 @@ impl Interpreter {
         match expr {
             Expr::Assign(token, value) => {
                 let val = self.evaluate_expr(value)?;
-                match self.env.assign(token.lexeme, val.clone()) {
+                match self.env.borrow_mut().assign(token.lexeme, val.clone()) {
                     Ok(_) => Ok(val),
                     Err(msg) => Err(RuntimeError {
                         token,
@@ -346,7 +352,24 @@ impl Interpreter {
             Expr::Get(expr, token) => todo!(),
             Expr::Grouping(expr) => self.evaluate_expr(expr),
             Expr::Literal(literal) => Ok(Value::from(literal)),
-            Expr::Logical(expr, token, expr1) => todo!(),
+            Expr::Logical(left_expr, operator, right_expr) => {
+                let left = self.evaluate_expr(left_expr)?;
+
+                match operator.typ {
+                    TokenType::Or => {
+                        if left.is_truthy() {
+                            return Ok(left);
+                        }
+                    }
+                    _ => {
+                        if !left.is_truthy() {
+                            return Ok(left);
+                        }
+                    }
+                };
+
+                self.evaluate_expr(right_expr)
+            }
             Expr::Set(expr, token, expr1) => todo!(),
             Expr::Super(token, token1) => todo!(),
             Expr::This(token) => todo!(),
@@ -364,7 +387,7 @@ impl Interpreter {
                     }),
                 }
             }
-            Expr::Variable(token) => match self.env.get(token.lexeme) {
+            Expr::Variable(token) => match self.env.borrow().get(token.lexeme) {
                 Ok(v) => Ok(v),
                 Err(msg) => Err(RuntimeError {
                     token,
