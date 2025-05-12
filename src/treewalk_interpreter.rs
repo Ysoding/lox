@@ -13,6 +13,86 @@ use crate::{Literal, LoxError, Parser, Scanner};
 
 type InterpretResult<'a, T> = Result<T, InterpretError<'a>>;
 
+pub trait Callable<'a>: ToString {
+    fn arity(&self) -> usize;
+    fn call(
+        &self,
+        interpreter: &mut Interpreter,
+        args: &'a [&'a Value<'a>],
+    ) -> Result<&'a Value<'a>, String>;
+}
+
+#[derive(Clone)]
+struct NativeFunction<'a> {
+    callable: fn(&mut Interpreter, &'a [&'a Value<'a>]) -> Result<&'a Value<'a>, String>,
+    arit: usize,
+}
+
+impl<'a> Callable<'a> for NativeFunction<'a> {
+    fn call(
+        &self,
+        interpreter: &mut Interpreter,
+        args: &'a [&'a Value<'a>],
+    ) -> Result<&'a Value<'a>, String> {
+        (self.callable)(interpreter, args)
+    }
+
+    fn arity(&self) -> usize {
+        self.arit
+    }
+}
+
+impl<'a> ToString for NativeFunction<'a> {
+    fn to_string(&self) -> String {
+        "<native fn>".to_string()
+    }
+}
+
+#[derive(Clone)]
+struct LoxFunction<'a> {
+    name: &'a Token<'a>,
+    params: &'a [&'a Token<'a>],
+    body: &'a Stmt<'a>,
+}
+
+impl<'a> LoxFunction<'a> {
+    pub fn new(name: &'a Token<'a>, params: &'a [&'a Token<'a>], body: &'a Stmt<'a>) -> Self {
+        Self { name, params, body }
+    }
+}
+
+impl<'a> Callable<'a> for LoxFunction<'a> {
+    fn arity(&self) -> usize {
+        self.params.len()
+    }
+
+    fn call(
+        &self,
+        interpreter: &mut Interpreter,
+        args: &'a [&'a Value],
+    ) -> Result<&'a Value<'a>, String> {
+        let mut env = Environment::with_enclosing(interpreter.env.clone());
+
+        for i in 0..self.params.len() {
+            env.define(self.params.get(i).unwrap().lexeme, args.get(i).unwrap());
+        }
+        match self.body {
+            Stmt::Block(stmts) => {
+                interpreter.execute_block(&stmts, env).unwrap();
+            }
+            _ => panic!("Expect Block"),
+        }
+
+        Ok(Value::Nil)
+    }
+}
+
+impl<'a> ToString for LoxFunction<'a> {
+    fn to_string(&self) -> String {
+        format!("<fn {}>", self.name.lexeme)
+    }
+}
+
 #[derive(Debug)]
 pub enum InterpretError<'a> {
     Runtime(RuntimeError<'a>),
@@ -45,14 +125,15 @@ impl<'a> From<InterpretError<'a>> for RuntimeError<'a> {
 }
 
 #[derive(Clone)]
-pub enum Value {
+pub enum Value<'a> {
     Number(f64),
-    String(String),
+    String(&'a str),
     Boolean(bool),
+    Callable(Rc<dyn Callable<'a>>),
     Nil,
 }
 
-impl Value {
+impl<'a> Value<'a> {
     fn is_truthy(&self) -> bool {
         match self {
             // Value::Number(v) => *v != 0.0,
@@ -74,11 +155,11 @@ impl Value {
     }
 }
 
-impl<'a> From<&Literal<'a>> for Value {
+impl<'a> From<&Literal<'a>> for Value<'a> {
     fn from(value: &Literal<'a>) -> Self {
         match value {
             Literal::Number(v) => Value::Number(*v),
-            Literal::String(v) => Value::String(v.to_string()),
+            Literal::String(v) => Value::String(v),
             Literal::True => Value::Boolean(true),
             Literal::False => Value::Boolean(false),
             Literal::Nil => Value::Nil,
@@ -86,7 +167,7 @@ impl<'a> From<&Literal<'a>> for Value {
     }
 }
 
-impl fmt::Display for Value {
+impl<'a> fmt::Display for Value<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Value::Number(n) => {
@@ -106,13 +187,16 @@ impl fmt::Display for Value {
             Value::Nil => {
                 f.write_str("nil")?;
             }
+            Value::Callable(callable) => {
+                f.write_str(&callable.to_string())?;
+            }
         };
         Ok(())
     }
 }
 
-impl Neg for Value {
-    type Output = Value;
+impl<'a> Neg for Value<'a> {
+    type Output = Value<'a>;
 
     fn neg(self) -> Self::Output {
         match self {
@@ -124,26 +208,26 @@ impl Neg for Value {
 }
 
 #[derive(Default)]
-struct Environment {
-    values: HashMap<String, Value>,
-    enclosing: Option<Rc<RefCell<Environment>>>,
+struct Environment<'a> {
+    values: HashMap<&'a str, &'a Value<'a>>,
+    enclosing: Option<Rc<RefCell<Environment<'a>>>>,
 }
 
-impl Environment {
-    pub fn with_enclosing(enclosing: Rc<RefCell<Environment>>) -> Self {
+impl<'a> Environment<'a> {
+    pub fn with_enclosing(enclosing: Rc<RefCell<Environment<'a>>>) -> Self {
         Self {
             values: HashMap::new(),
             enclosing: Some(enclosing),
         }
     }
 
-    pub fn define(&mut self, name: &str, value: Value) {
-        self.values.insert(name.to_string(), value);
+    pub fn define(&mut self, name: &'a str, value: &'a Value<'a>) {
+        self.values.insert(name, value);
     }
 
-    pub fn get(&self, name: &str) -> Result<Value, String> {
+    pub fn get(&self, name: &str) -> Result<&'a Value<'a>, String> {
         if self.values.contains_key(name) {
-            return Ok(self.values.get(name).unwrap().clone());
+            return Ok(self.values.get(name).unwrap());
         }
 
         if let Some(enclosing) = &self.enclosing {
@@ -153,9 +237,9 @@ impl Environment {
         Err(format!("Undefined variable '{}'.", name))
     }
 
-    pub fn assign(&mut self, name: &str, val: Value) -> Result<(), String> {
+    pub fn assign(&mut self, name: &'a str, val: &'a Value<'a>) -> Result<(), String> {
         if self.values.contains_key(name) {
-            self.values.insert(name.to_string(), val);
+            self.values.insert(name, val);
             return Ok(());
         }
 
@@ -167,12 +251,32 @@ impl Environment {
     }
 }
 
-#[derive(Default)]
-pub struct Interpreter {
-    env: Rc<RefCell<Environment>>,
+pub struct Interpreter<'a> {
+    env: Rc<RefCell<Environment<'a>>>,
 }
 
-impl Interpreter {
+impl<'a> Interpreter<'a> {
+    pub fn new() -> Self {
+        let env = Rc::new(RefCell::new(Environment::default()));
+        env.borrow_mut().define(
+            "clock",
+            Value::Callable(Rc::new(NativeFunction {
+                callable: |_interpreter: &mut Interpreter,
+                           _arguments: &[Value]|
+                 -> Result<Value, String> {
+                    Ok(Value::Number(
+                        std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap()
+                            .as_secs_f64(),
+                    ))
+                },
+                arit: 0,
+            })),
+        );
+        Self { env }
+    }
+
     pub fn interpret<'a>(&mut self, stmts: BVec<'a, &'a Stmt<'a>>) -> Result<(), RuntimeError<'a>> {
         for stmt in stmts {
             match self.execute_stmt(stmt) {
@@ -290,7 +394,6 @@ impl Interpreter {
             Stmt::Expression(expr) => {
                 let _value = self.evaluate_expr(expr)?;
             }
-            Stmt::Function => todo!(),
             Stmt::Print(expr) => {
                 let value = self.evaluate_expr(expr)?;
                 println!("{}", value);
@@ -325,6 +428,13 @@ impl Interpreter {
             }
             Stmt::Break(token) => {
                 return Err(InterpretError::Break(Break { token }));
+            }
+            Stmt::Function(name, params, body) => {
+                let f = LoxFunction::new(name, params, body);
+                self.env
+                    .borrow_mut()
+                    .define(name.lexeme, Value::Callable(Rc::new(f)));
+                return Ok(());
             }
         }
         Ok(())
@@ -397,7 +507,45 @@ impl Interpreter {
                     .into()),
                 }
             }
-            Expr::Call(expr, token, exprs) => todo!(),
+            Expr::Call(callee, paren, args) => {
+                let callee = self.evaluate_expr(&callee)?;
+
+                let mut arguments = vec![];
+                for arg in args {
+                    arguments.push(self.evaluate_expr(arg)?);
+                }
+
+                match callee {
+                    Value::Callable(callable) => {
+                        // Call the function
+                        if callable.arity() != arguments.len() {
+                            return Err(RuntimeError {
+                                token: paren,
+                                message: format!(
+                                    "Expected {} arguments but got {}.",
+                                    callable.arity(),
+                                    arguments.len()
+                                ),
+                            }
+                            .into());
+                        }
+
+                        match callable.call(self, &arguments) {
+                            Ok(v) => Ok(v),
+                            Err(message) => Err(RuntimeError {
+                                token: paren,
+                                message,
+                            }
+                            .into()),
+                        }
+                    }
+                    _ => Err(RuntimeError {
+                        token: paren,
+                        message: "Can only call functions and classes.".to_string(),
+                    }
+                    .into()),
+                }
+            }
             Expr::Get(expr, token) => todo!(),
             Expr::Grouping(expr) => self.evaluate_expr(expr),
             Expr::Literal(literal) => Ok(Value::from(literal)),
@@ -446,6 +594,12 @@ impl Interpreter {
                 .into()),
             },
         }
+    }
+}
+
+impl Default for Interpreter {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

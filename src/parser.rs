@@ -61,11 +61,43 @@ impl<'a> Parser<'a> {
     }
 
     fn declaration(&self) -> ParseResult<&'a Stmt<'a>> {
+        if self.match_one(&TokenType::Fun) {
+            return self.function("function");
+        }
         if self.match_one(&TokenType::Var) {
             return self.var_declaration();
         }
 
         self.statement()
+    }
+
+    fn function(&self, kind: &str) -> ParseResult<&'a Stmt<'a>> {
+        let name = self.consume(&TokenType::Identifier, &format!("Expect {} name.", kind))?;
+        self.consume(
+            &TokenType::LeftParen,
+            &format!("Expect '(' after {} name.", kind),
+        )?;
+        let mut parameters = BVec::new_in(&self.bump);
+        if !self.check(&TokenType::RightParen) {
+            loop {
+                if parameters.len() >= 255 {
+                    self.error(self.peek(), "Can't have more than 255 parameters.");
+                }
+                parameters.push(self.consume(&TokenType::Identifier, "Expect parameter name.")?);
+
+                if !self.match_one(&TokenType::Comma) {
+                    break;
+                }
+            }
+        }
+        self.consume(&TokenType::RightParen, "Expect ')' after parameters.")?;
+
+        self.consume(
+            &TokenType::LeftBrace,
+            &format!("Expect '{{' before {} body.", kind),
+        )?;
+        let body = self.block_statement()?;
+        Ok(self.bump.alloc(Stmt::Function(name, parameters, body)))
     }
 
     fn var_declaration(&self) -> ParseResult<&'a Stmt<'a>> {
@@ -272,7 +304,6 @@ impl<'a> Parser<'a> {
         }
     }
 
-    // equality       → comparison ( ( "!=" | "==" ) comparison )* ;
     fn equality(&self) -> ParseResult<&'a Expr<'a>> {
         let mut expr = self.comparison()?;
         let typs = vec![TokenType::BangEqual, TokenType::EqualEqual];
@@ -284,7 +315,6 @@ impl<'a> Parser<'a> {
         Ok(expr)
     }
 
-    // comparison     → term ( ( ">" | ">=" | "<" | "<=" ) term )* ;
     fn comparison(&self) -> ParseResult<&'a Expr<'a>> {
         let mut expr = self.term()?;
         let typs = vec![
@@ -323,7 +353,6 @@ impl<'a> Parser<'a> {
         Ok(expr)
     }
 
-    //    unary          → ( "!" | "-" ) unary | primary ;
     fn unary(&self) -> ParseResult<&'a Expr<'a>> {
         let typs = vec![TokenType::Bang, TokenType::Minus];
         if self.match_any(&typs) {
@@ -331,10 +360,38 @@ impl<'a> Parser<'a> {
             let right = self.unary()?;
             return Ok(self.bump.alloc(Expr::Unary(operator, right)));
         }
-        self.primary()
+        self.call()
     }
 
-    // primary        → NUMBER | STRING | "true" | "false" | "nil" | "(" expression ")" | IDENTIFIER ;
+    fn call(&self) -> ParseResult<&'a Expr<'a>> {
+        let mut expr = self.primary()?;
+        loop {
+            if self.match_one(&TokenType::LeftParen) {
+                expr = self.finish_call(expr)?;
+            } else {
+                break;
+            }
+        }
+        Ok(expr)
+    }
+
+    fn finish_call(&self, callee: &'a Expr<'a>) -> ParseResult<&'a Expr<'a>> {
+        let mut args = BVec::new_in(&self.bump);
+        if !self.check(&TokenType::RightParen) {
+            loop {
+                if args.len() >= 255 {
+                    self.error(self.peek(), "Can't have more than 255 arguments.");
+                }
+                args.push(self.expression()?);
+                if !self.match_one(&TokenType::Comma) {
+                    break;
+                }
+            }
+        }
+        let paren = self.consume(&TokenType::RightParen, "Expect ')' after arguments.")?;
+        Ok(self.bump.alloc(Expr::Call(callee, paren, args)))
+    }
+
     fn primary(&self) -> ParseResult<&'a Expr<'a>> {
         if self.match_one(&TokenType::False) {
             return Ok(self.bump.alloc(Expr::Literal(Literal::False)));

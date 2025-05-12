@@ -6,7 +6,11 @@ pub enum Stmt<'a> {
     Block(bumpalo::collections::Vec<'a, &'a Stmt<'a>>),
     Class,
     Expression(&'a Expr<'a>),
-    Function,
+    Function(
+        &'a Token<'a>,
+        bumpalo::collections::Vec<'a, &'a Token<'a>>,
+        &'a Stmt<'a>,
+    ),
     If(&'a Expr<'a>, &'a Stmt<'a>, Option<&'a Stmt<'a>>),
     Print(&'a Expr<'a>),
     Return,
@@ -19,7 +23,11 @@ pub enum Stmt<'a> {
 pub enum Expr<'a> {
     Assign(&'a Token<'a>, &'a Expr<'a>),
     Binary(&'a Expr<'a>, &'a Token<'a>, &'a Expr<'a>),
-    Call(&'a Expr<'a>, &'a Token<'a>, Vec<&'a Expr<'a>>),
+    Call(
+        &'a Expr<'a>,
+        &'a Token<'a>,
+        bumpalo::collections::Vec<'a, &'a Expr<'a>>,
+    ),
     Get(&'a Expr<'a>, &'a Token<'a>),
     Grouping(&'a Expr<'a>),
     Literal(Literal<'a>),
