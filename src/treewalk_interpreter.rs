@@ -1,7 +1,6 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt::{self};
-use std::ops::Neg;
 use std::rc::Rc;
 
 use anyhow::Result;
@@ -9,7 +8,7 @@ use bumpalo::{collections::Vec as BVec, Bump};
 
 use crate::expr::{Expr, Stmt};
 use crate::token::{Token, TokenType};
-use crate::{Literal, LoxError, Parser, Scanner};
+use crate::{Interpreter, Literal, LoxError, Parser, Scanner};
 
 type InterpretResult<'a, T> = Result<T, InterpretError<'a>>;
 
@@ -17,21 +16,22 @@ pub trait Callable<'a>: ToString {
     fn arity(&self) -> usize;
     fn call(
         &self,
-        interpreter: &mut Interpreter,
+        interpreter: &mut TreewalkInterpreter<'a>,
         args: &'a [&'a Value<'a>],
     ) -> Result<&'a Value<'a>, String>;
 }
 
 #[derive(Clone)]
 struct NativeFunction<'a> {
-    callable: fn(&mut Interpreter, &'a [&'a Value<'a>]) -> Result<&'a Value<'a>, String>,
+    callable:
+        fn(&mut TreewalkInterpreter<'a>, &'a [&'a Value<'a>]) -> Result<&'a Value<'a>, String>,
     arit: usize,
 }
 
 impl<'a> Callable<'a> for NativeFunction<'a> {
     fn call(
         &self,
-        interpreter: &mut Interpreter,
+        interpreter: &mut TreewalkInterpreter<'a>,
         args: &'a [&'a Value<'a>],
     ) -> Result<&'a Value<'a>, String> {
         (self.callable)(interpreter, args)
@@ -68,11 +68,10 @@ impl<'a> Callable<'a> for LoxFunction<'a> {
 
     fn call(
         &self,
-        interpreter: &mut Interpreter,
-        args: &'a [&'a Value],
+        interpreter: &mut TreewalkInterpreter<'a>,
+        args: &'a [&'a Value<'a>],
     ) -> Result<&'a Value<'a>, String> {
         let mut env = Environment::with_enclosing(interpreter.env.clone());
-
         for i in 0..self.params.len() {
             env.define(self.params.get(i).unwrap().lexeme, args.get(i).unwrap());
         }
@@ -82,8 +81,7 @@ impl<'a> Callable<'a> for LoxFunction<'a> {
             }
             _ => panic!("Expect Block"),
         }
-
-        Ok(Value::Nil)
+        Ok(interpreter.bump.alloc(Value::Nil))
     }
 }
 
@@ -129,7 +127,7 @@ pub enum Value<'a> {
     Number(f64),
     String(&'a str),
     Boolean(bool),
-    Callable(Rc<dyn Callable<'a>>),
+    Callable(&'a dyn Callable<'a>),
     Nil,
 }
 
@@ -195,18 +193,6 @@ impl<'a> fmt::Display for Value<'a> {
     }
 }
 
-impl<'a> Neg for Value<'a> {
-    type Output = Value<'a>;
-
-    fn neg(self) -> Self::Output {
-        match self {
-            Value::Number(n) => Value::Number(-n),
-            // FIXME: ERROR
-            _ => Value::Nil,
-        }
-    }
-}
-
 #[derive(Default)]
 struct Environment<'a> {
     values: HashMap<&'a str, &'a Value<'a>>,
@@ -214,18 +200,18 @@ struct Environment<'a> {
 }
 
 impl<'a> Environment<'a> {
-    pub fn with_enclosing(enclosing: Rc<RefCell<Environment<'a>>>) -> Self {
+    fn with_enclosing(enclosing: Rc<RefCell<Environment<'a>>>) -> Self {
         Self {
             values: HashMap::new(),
             enclosing: Some(enclosing),
         }
     }
 
-    pub fn define(&mut self, name: &'a str, value: &'a Value<'a>) {
+    fn define(&mut self, name: &'a str, value: &'a Value<'a>) {
         self.values.insert(name, value);
     }
 
-    pub fn get(&self, name: &str) -> Result<&'a Value<'a>, String> {
+    fn get(&self, name: &str) -> Result<&'a Value<'a>, String> {
         if self.values.contains_key(name) {
             return Ok(self.values.get(name).unwrap());
         }
@@ -237,7 +223,7 @@ impl<'a> Environment<'a> {
         Err(format!("Undefined variable '{}'.", name))
     }
 
-    pub fn assign(&mut self, name: &'a str, val: &'a Value<'a>) -> Result<(), String> {
+    fn assign(&mut self, name: &'a str, val: &'a Value<'a>) -> Result<(), String> {
         if self.values.contains_key(name) {
             self.values.insert(name, val);
             return Ok(());
@@ -251,33 +237,32 @@ impl<'a> Environment<'a> {
     }
 }
 
-pub struct Interpreter<'a> {
+pub struct TreewalkInterpreter<'a> {
     env: Rc<RefCell<Environment<'a>>>,
+    bump: &'a Bump,
 }
 
-impl<'a> Interpreter<'a> {
-    pub fn new() -> Self {
+impl<'a> TreewalkInterpreter<'a> {
+    pub fn new(bump: &'a Bump) -> Self {
         let env = Rc::new(RefCell::new(Environment::default()));
         env.borrow_mut().define(
             "clock",
-            Value::Callable(Rc::new(NativeFunction {
-                callable: |_interpreter: &mut Interpreter,
-                           _arguments: &[Value]|
-                 -> Result<Value, String> {
-                    Ok(Value::Number(
-                        std::time::SystemTime::now()
-                            .duration_since(std::time::UNIX_EPOCH)
-                            .unwrap()
-                            .as_secs_f64(),
-                    ))
-                },
+            bump.alloc(Value::Callable(bump.alloc(NativeFunction {
                 arit: 0,
-            })),
+                callable: |interpreter: &mut TreewalkInterpreter<'a>,
+                           _args: &'a [&'a Value<'a>]| {
+                    use std::time::SystemTime;
+                    let now = SystemTime::now();
+                    let duration = now.duration_since(SystemTime::UNIX_EPOCH).unwrap();
+                    let seconds = duration.as_secs_f64();
+                    Ok(interpreter.bump.alloc(Value::Number(seconds)))
+                },
+            }))),
         );
-        Self { env }
+        Self { env, bump }
     }
 
-    pub fn interpret<'a>(&mut self, stmts: BVec<'a, &'a Stmt<'a>>) -> Result<(), RuntimeError<'a>> {
+    pub fn interpret(&mut self, stmts: BVec<'a, &'a Stmt<'a>>) -> Result<(), RuntimeError<'a>> {
         for stmt in stmts {
             match self.execute_stmt(stmt) {
                 Ok(()) => {}
@@ -293,11 +278,11 @@ impl<'a> Interpreter<'a> {
         Ok(())
     }
 
-    fn check_number_operand<'b>(
+    fn check_number_operand(
         &self,
-        token: &'b Token<'b>,
-        operand: &Value,
-    ) -> InterpretResult<'b, ()> {
+        token: &'a Token<'a>,
+        operand: &'a Value<'a>,
+    ) -> InterpretResult<'a, ()> {
         if let Value::Number(_) = operand {
             Ok(())
         } else {
@@ -309,12 +294,12 @@ impl<'a> Interpreter<'a> {
         }
     }
 
-    fn check_number_operands<'b>(
+    fn check_number_operands(
         &self,
-        token: &'b Token<'b>,
-        left: &Value,
-        right: &Value,
-    ) -> InterpretResult<'b, ()> {
+        token: &'a Token<'a>,
+        left: &'a Value<'a>,
+        right: &'a Value<'a>,
+    ) -> InterpretResult<'a, ()> {
         if let (Value::Number(_), Value::Number(_)) = (left, right) {
             Ok(())
         } else {
@@ -326,19 +311,19 @@ impl<'a> Interpreter<'a> {
         }
     }
 
-    fn binary_op<'b, F>(
+    fn binary_op<F>(
         &self,
-        token: &'b Token<'b>,
-        a: Value,
-        b: Value,
+        token: &'a Token<'a>,
+        a: &'a Value<'a>,
+        b: &'a Value<'a>,
         op: F,
-    ) -> InterpretResult<'b, Value>
+    ) -> InterpretResult<'a, &'a Value<'a>>
     where
         F: Fn(f64, f64) -> f64,
     {
         self.check_number_operands(token, &a, &b)?;
         if let (Value::Number(a_val), Value::Number(b_val)) = (a, b) {
-            Ok(Value::Number(op(a_val, b_val)))
+            Ok(self.bump.alloc(Value::Number(op(*a_val, *b_val))))
         } else {
             // This should be unreachable due to the check above
             Err(RuntimeError {
@@ -349,19 +334,19 @@ impl<'a> Interpreter<'a> {
         }
     }
 
-    fn comparison_op<'b, F>(
+    fn comparison_op<F>(
         &self,
-        token: &'b Token<'b>,
-        a: Value,
-        b: Value,
+        token: &'a Token<'a>,
+        a: &'a Value<'a>,
+        b: &'a Value<'a>,
         op: F,
-    ) -> InterpretResult<'b, Value>
+    ) -> InterpretResult<'a, &'a Value<'a>>
     where
         F: Fn(f64, f64) -> bool,
     {
         self.check_number_operands(token, &a, &b)?;
         if let (Value::Number(a_val), Value::Number(b_val)) = (a, b) {
-            Ok(Value::Boolean(op(a_val, b_val)))
+            Ok(self.bump.alloc(Value::Boolean(op(*a_val, *b_val))))
         } else {
             Err(RuntimeError {
                 token,
@@ -371,15 +356,17 @@ impl<'a> Interpreter<'a> {
         }
     }
 
-    fn handle_plus<'b>(
+    fn handle_plus(
         &self,
-        token: &'b Token<'b>,
-        a: Value,
-        b: Value,
-    ) -> InterpretResult<'b, Value> {
+        token: &'a Token<'a>,
+        a: &'a Value<'a>,
+        b: &'a Value<'a>,
+    ) -> InterpretResult<'a, &'a Value<'a>> {
         match (a, b) {
-            (Value::Number(n1), Value::Number(n2)) => Ok(Value::Number(n1 + n2)),
-            (Value::String(s1), Value::String(s2)) => Ok(Value::String(format!("{}{}", s1, s2))),
+            (Value::Number(n1), Value::Number(n2)) => Ok(self.bump.alloc(Value::Number(n1 + n2))),
+            (Value::String(s1), Value::String(s2)) => Ok(self
+                .bump
+                .alloc(Value::String(self.bump.alloc_str(&format!("{}{}", s1, s2))))),
             _ => Err(RuntimeError {
                 token,
                 message: "Operands must be two numbers or two strings.".to_string(),
@@ -388,7 +375,7 @@ impl<'a> Interpreter<'a> {
         }
     }
 
-    fn execute_stmt<'a>(&mut self, stmt: &'a Stmt<'a>) -> InterpretResult<'a, ()> {
+    fn execute_stmt(&mut self, stmt: &'a Stmt<'a>) -> InterpretResult<'a, ()> {
         match stmt {
             Stmt::Class => todo!(),
             Stmt::Expression(expr) => {
@@ -402,7 +389,7 @@ impl<'a> Interpreter<'a> {
             Stmt::Var(token, initializer) => {
                 let value = match initializer {
                     Some(v) => self.evaluate_expr(v)?,
-                    None => Value::Nil,
+                    None => self.bump.alloc(Value::Nil),
                 };
                 self.env.borrow_mut().define(token.lexeme, value);
             }
@@ -430,26 +417,25 @@ impl<'a> Interpreter<'a> {
                 return Err(InterpretError::Break(Break { token }));
             }
             Stmt::Function(name, params, body) => {
-                let f = LoxFunction::new(name, params, body);
+                let f = self.bump.alloc(LoxFunction::new(name, params, &body));
                 self.env
                     .borrow_mut()
-                    .define(name.lexeme, Value::Callable(Rc::new(f)));
-                return Ok(());
+                    .define(name.lexeme, self.bump.alloc(Value::Callable(f)));
             }
         }
         Ok(())
     }
 
-    fn execute_block<'a>(
+    fn execute_block(
         &mut self,
         stmts: &'a [&Stmt<'a>],
-        block_env: Environment,
-    ) -> InterpretResult<'a, Value> {
+        block_env: Environment<'a>,
+    ) -> InterpretResult<'a, &'a Value<'a>> {
         let previous = Rc::clone(&self.env);
 
         self.env = Rc::new(RefCell::new(block_env));
 
-        let mut result = Ok(Value::Nil);
+        let mut result: InterpretResult<'a, &'a Value<'a>> = Ok(self.bump.alloc(Value::Nil));
         for stmt in stmts {
             match self.execute_stmt(stmt) {
                 Ok(()) => {}
@@ -465,12 +451,12 @@ impl<'a> Interpreter<'a> {
     }
 
     #[allow(unused)]
-    fn evaluate_expr<'a>(&mut self, expr: &'a Expr<'a>) -> InterpretResult<'a, Value> {
+    fn evaluate_expr(&mut self, expr: &'a Expr<'a>) -> InterpretResult<'a, &'a Value<'a>> {
         match expr {
             Expr::Assign(token, value) => {
                 let val = self.evaluate_expr(value)?;
-                match self.env.borrow_mut().assign(token.lexeme, val.clone()) {
-                    Ok(_) => Ok(val),
+                match self.env.borrow_mut().assign(token.lexeme, val) {
+                    Ok(()) => Ok(val),
                     Err(msg) => Err(RuntimeError {
                         token,
                         message: msg,
@@ -498,8 +484,12 @@ impl<'a> Interpreter<'a> {
                     TokenType::LessEqual => {
                         self.comparison_op(operator, left_val, right_val, |a, b| a <= b)
                     }
-                    TokenType::BangEqual => Ok(Value::Boolean(!left_val.is_equal(&right_val))),
-                    TokenType::EqualEqual => Ok(Value::Boolean(left_val.is_equal(&right_val))),
+                    TokenType::BangEqual => Ok(self
+                        .bump
+                        .alloc(Value::Boolean(!left_val.is_equal(&right_val)))),
+                    TokenType::EqualEqual => Ok(self
+                        .bump
+                        .alloc(Value::Boolean(left_val.is_equal(&right_val)))),
                     _ => Err(RuntimeError {
                         token: operator,
                         message: "Unsupported operator.".to_string(),
@@ -510,10 +500,12 @@ impl<'a> Interpreter<'a> {
             Expr::Call(callee, paren, args) => {
                 let callee = self.evaluate_expr(&callee)?;
 
-                let mut arguments = vec![];
-                for arg in args {
-                    arguments.push(self.evaluate_expr(arg)?);
-                }
+                let arguments: Vec<_> = args
+                    .iter()
+                    .map(|arg| self.evaluate_expr(arg))
+                    .collect::<Result<_, _>>()?;
+
+                let arguments_slice = self.bump.alloc_slice_copy(&arguments);
 
                 match callee {
                     Value::Callable(callable) => {
@@ -530,14 +522,13 @@ impl<'a> Interpreter<'a> {
                             .into());
                         }
 
-                        match callable.call(self, &arguments) {
-                            Ok(v) => Ok(v),
-                            Err(message) => Err(RuntimeError {
+                        callable.call(self, arguments_slice).map_err(|message| {
+                            RuntimeError {
                                 token: paren,
                                 message,
                             }
-                            .into()),
-                        }
+                            .into()
+                        })
                     }
                     _ => Err(RuntimeError {
                         token: paren,
@@ -548,7 +539,7 @@ impl<'a> Interpreter<'a> {
             }
             Expr::Get(expr, token) => todo!(),
             Expr::Grouping(expr) => self.evaluate_expr(expr),
-            Expr::Literal(literal) => Ok(Value::from(literal)),
+            Expr::Literal(literal) => Ok(self.bump.alloc(Value::from(literal))),
             Expr::Logical(left_expr, operator, right_expr) => {
                 let left = self.evaluate_expr(left_expr)?;
 
@@ -574,10 +565,14 @@ impl<'a> Interpreter<'a> {
                 let right_val = self.evaluate_expr(right)?;
                 match operator.typ {
                     TokenType::Minus => {
-                        self.check_number_operand(operator, &right_val)?;
-                        Ok(-right_val)
+                        self.check_number_operand(operator, right_val)?;
+                        match right_val {
+                            Value::Number(n) => Ok(self.bump.alloc(Value::Number(-n))),
+                            // FIXME: ERROR
+                            _ => Ok(self.bump.alloc(Value::Nil)),
+                        }
                     }
-                    TokenType::Bang => Ok(Value::Boolean(!right_val.is_truthy())),
+                    TokenType::Bang => Ok(self.bump.alloc(Value::Boolean(!right_val.is_truthy()))),
                     _ => Err(RuntimeError {
                         token: operator,
                         message: "Unsupported unary operator.".to_string(),
@@ -597,47 +592,35 @@ impl<'a> Interpreter<'a> {
     }
 }
 
-impl Default for Interpreter {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+impl<'a> Interpreter<'a> for TreewalkInterpreter<'a> {
+    fn run(&mut self, source_code: &'a str) -> Result<(), LoxError> {
+        let mut scanner = Scanner::new(&source_code, &self.bump);
 
-pub fn run_interpreter<'a>(
-    source_code: &'a str,
-    interpreter: &mut Interpreter,
-    bump: &'a Bump,
-) -> Result<(), LoxError> {
-    let mut scanner = Scanner::new(source_code, bump);
+        scanner.scan_tokens();
 
-    scanner.scan_tokens();
-
-    for token in &scanner.tokens {
-        if token.typ == TokenType::Error {
-            println!("[line {}] Error: Unexpected character.", token.line);
-            return Err(LoxError::CompileError);
-        }
-    }
-
-    let parser = Parser::new(&scanner.tokens, bump);
-    match parser.parse() {
-        Ok(stmts) => {
-            let res = interpreter.interpret(stmts);
-            match res {
-                Ok(v) => Ok(v),
-                Err(e) => {
-                    runtime_error(e);
-                    Err(LoxError::RuntimeError)
-                }
+        for token in &scanner.tokens {
+            if token.typ == TokenType::Error {
+                println!("[line {}] Error: Unexpected character.", token.line);
+                return Err(LoxError::CompileError);
             }
         }
-        Err(e) => {
-            println!("{}", e);
-            Err(LoxError::CompileError)
+
+        let parser = Parser::new(&scanner.tokens, &self.bump);
+        match parser.parse() {
+            Ok(stmts) => {
+                let res = self.interpret(stmts);
+                match res {
+                    Ok(v) => Ok(v),
+                    Err(e) => {
+                        eprintln!("[line {}] {}", e.token.line, e.message);
+                        Err(LoxError::RuntimeError)
+                    }
+                }
+            }
+            Err(e) => {
+                println!("{}", e);
+                Err(LoxError::CompileError)
+            }
         }
     }
-}
-
-fn runtime_error(e: RuntimeError) {
-    eprintln!("[line {}] {}", e.token.line, e.message);
 }

@@ -1,6 +1,8 @@
 use core::fmt;
 
-#[derive(Debug, Clone)]
+use bumpalo::Bump;
+
+#[derive(Debug)]
 pub struct Token<'a> {
     pub typ: TokenType,
     pub lexeme: &'a str,
@@ -8,7 +10,7 @@ pub struct Token<'a> {
     pub literal: Option<Literal<'a>>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum Literal<'a> {
     Number(f64),
     String(&'a str),
@@ -25,6 +27,29 @@ impl<'a> Token<'a> {
             line,
             literal,
         }
+    }
+}
+
+impl<'a> Literal<'a> {
+    pub fn clone_to<'b>(&self, bump: &'b Bump) -> Literal<'b> {
+        match self {
+            Literal::Number(n) => Literal::Number(*n),
+            Literal::String(s) => Literal::String(bump.alloc_str(s)),
+            Literal::True => Literal::True,
+            Literal::False => Literal::False,
+            Literal::Nil => Literal::Nil,
+        }
+    }
+}
+
+impl<'a> Token<'a> {
+    pub fn clone_to<'b>(&self, bump: &'b Bump) -> &'b Token<'b> {
+        bump.alloc(Token {
+            typ: self.typ,
+            lexeme: bump.alloc_str(self.lexeme),
+            line: self.line,
+            literal: self.literal.as_ref().map(|lit| lit.clone_to(bump)),
+        })
     }
 }
 

@@ -1,3 +1,5 @@
+use anyhow::Result;
+
 mod expr;
 use expr::*;
 
@@ -11,3 +13,7 @@ mod treewalk_interpreter;
 pub use treewalk_interpreter::*;
 mod parser;
 pub use parser::*;
+
+pub trait Interpreter<'a> {
+    fn run(&mut self, source_code: &'a str) -> Result<(), LoxError>;
+}

@@ -6,7 +6,7 @@ use std::{
 };
 
 use bumpalo::Bump;
-use lox::{run_interpreter, Interpreter};
+use lox::{Interpreter, TreewalkInterpreter};
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -20,9 +20,9 @@ fn main() {
 fn run_file(file_path: PathBuf) {
     let source = fs::read_to_string(file_path).expect("Failed to read source file");
     let bump = Bump::new();
-    let mut interp = Interpreter::default();
+    let mut interp = TreewalkInterpreter::new(&bump);
 
-    if let Err(error) = run_interpreter(&source, &mut interp, &bump) {
+    if let Err(error) = interp.run(&source) {
         match error {
             lox::LoxError::CompileError => process::exit(65),
             lox::LoxError::RuntimeError => process::exit(70),
@@ -33,8 +33,9 @@ fn run_file(file_path: PathBuf) {
 fn run_prompt() {
     let mut input = io::stdin().lock();
     let mut output = io::stdout();
-    let mut bump = Bump::new();
-    let mut interpreter = Interpreter::default();
+    // FIXME: Memory keeps growing indefinitely; needs a reset, or separate the AST part from the Value part.
+    let global_bump = Bump::new();
+    let mut interp = TreewalkInterpreter::new(&global_bump);
 
     loop {
         output.write_all(b"> ").unwrap();
@@ -48,7 +49,7 @@ fn run_prompt() {
         if buffer.is_empty() {
             continue;
         }
-        run_interpreter(&buffer, &mut interpreter, &bump).ok();
-        bump.reset();
+
+        interp.run(global_bump.alloc_str(&buffer)).ok();
     }
 }
