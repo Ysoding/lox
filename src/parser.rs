@@ -5,7 +5,7 @@ use anyhow::Result;
 use crate::{
     expr::Stmt,
     token::{Literal, TokenType},
-    Expr, Token,
+    Expr, Token, Value,
 };
 
 use bumpalo::{collections::Vec as BVec, Bump};
@@ -132,6 +132,10 @@ impl<'a> Parser<'a> {
             return self.print_statement();
         }
 
+        if self.match_one(&TokenType::Return) {
+            return self.return_statement();
+        }
+
         if self.match_one(&TokenType::While) {
             return self.while_statement();
         }
@@ -141,6 +145,19 @@ impl<'a> Parser<'a> {
         }
 
         self.expression_statement()
+    }
+
+    fn return_statement(&self) -> ParseResult<&'a Stmt<'a>> {
+        let keyword = self.previous();
+
+        let value = if !self.check(&TokenType::Semicolon) {
+            Some(self.expression()?)
+        } else {
+            None
+        };
+
+        self.consume(&TokenType::Semicolon, "Expect ';' after return value.")?;
+        Ok(self.bump.alloc(Stmt::Return(keyword, value)))
     }
 
     fn break_statement(&self) -> ParseResult<&'a Stmt<'a>> {

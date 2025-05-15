@@ -13,7 +13,7 @@ pub enum Stmt<'a> {
     ),
     If(&'a Expr<'a>, &'a Stmt<'a>, Option<&'a Stmt<'a>>),
     Print(&'a Expr<'a>),
-    Return,
+    Return(&'a Token<'a>, Option<&'a Expr<'a>>),
     Var(&'a Token<'a>, Option<&'a Expr<'a>>),
     While(&'a Expr<'a>, &'a Stmt<'a>),
     Break(&'a Token<'a>),

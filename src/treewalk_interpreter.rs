@@ -1,6 +1,6 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::fmt::{self};
+use std::fmt::{self, Debug};
 use std::rc::Rc;
 
 use anyhow::Result;
@@ -12,19 +12,19 @@ use crate::{Interpreter, Literal, LoxError, Parser, Scanner};
 
 type InterpretResult<'a, T> = Result<T, InterpretError<'a>>;
 
-pub trait Callable<'a>: ToString {
+pub trait Callable<'a>: ToString + Debug {
     fn arity(&self) -> usize;
     fn call(
         &self,
         interpreter: &mut TreewalkInterpreter<'a>,
         args: &'a [&'a Value<'a>],
-    ) -> Result<&'a Value<'a>, String>;
+    ) -> InterpretResult<'a, &'a Value<'a>>;
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct NativeFunction<'a> {
     callable:
-        fn(&mut TreewalkInterpreter<'a>, &'a [&'a Value<'a>]) -> Result<&'a Value<'a>, String>,
+        fn(&mut TreewalkInterpreter<'a>, &'a [&'a Value<'a>]) -> InterpretResult<'a, &'a Value<'a>>,
     arit: usize,
 }
 
@@ -33,7 +33,7 @@ impl<'a> Callable<'a> for NativeFunction<'a> {
         &self,
         interpreter: &mut TreewalkInterpreter<'a>,
         args: &'a [&'a Value<'a>],
-    ) -> Result<&'a Value<'a>, String> {
+    ) -> InterpretResult<'a, &'a Value<'a>> {
         (self.callable)(interpreter, args)
     }
 
@@ -48,7 +48,7 @@ impl<'a> ToString for NativeFunction<'a> {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct LoxFunction<'a> {
     name: &'a Token<'a>,
     params: &'a [&'a Token<'a>],
@@ -70,18 +70,27 @@ impl<'a> Callable<'a> for LoxFunction<'a> {
         &self,
         interpreter: &mut TreewalkInterpreter<'a>,
         args: &'a [&'a Value<'a>],
-    ) -> Result<&'a Value<'a>, String> {
+    ) -> InterpretResult<'a, &'a Value<'a>> {
         let mut env = Environment::with_enclosing(interpreter.env.clone());
         for i in 0..self.params.len() {
             env.define(self.params.get(i).unwrap().lexeme, args.get(i).unwrap());
         }
         match self.body {
-            Stmt::Block(stmts) => {
-                interpreter.execute_block(&stmts, env).unwrap();
-            }
+            Stmt::Block(stmts) => match interpreter.execute_block(&stmts, env) {
+                Ok(v) => {
+                    return Ok(v);
+                }
+                Err(err) => match err {
+                    InterpretError::Return(v) => {
+                        return Ok(v.value);
+                    }
+                    _ => {
+                        return Err(err);
+                    }
+                },
+            },
             _ => panic!("Expect Block"),
         }
-        Ok(interpreter.bump.alloc(Value::Nil))
     }
 }
 
@@ -95,6 +104,7 @@ impl<'a> ToString for LoxFunction<'a> {
 pub enum InterpretError<'a> {
     Runtime(RuntimeError<'a>),
     Break(Break<'a>),
+    Return(Return<'a>),
 }
 
 impl<'a> From<RuntimeError<'a>> for InterpretError<'a> {
@@ -102,6 +112,12 @@ impl<'a> From<RuntimeError<'a>> for InterpretError<'a> {
         InterpretError::Runtime(err)
     }
 }
+
+#[derive(Debug)]
+pub struct Return<'a> {
+    value: &'a Value<'a>,
+}
+
 #[derive(Debug)]
 pub struct Break<'a> {
     token: &'a Token<'a>,
@@ -122,7 +138,7 @@ impl<'a> From<InterpretError<'a>> for RuntimeError<'a> {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Value<'a> {
     Number(f64),
     String(&'a str),
@@ -385,7 +401,6 @@ impl<'a> TreewalkInterpreter<'a> {
                 let value = self.evaluate_expr(expr)?;
                 println!("{}", value);
             }
-            Stmt::Return => todo!(),
             Stmt::Var(token, initializer) => {
                 let value = match initializer {
                     Some(v) => self.evaluate_expr(v)?,
@@ -421,6 +436,13 @@ impl<'a> TreewalkInterpreter<'a> {
                 self.env
                     .borrow_mut()
                     .define(name.lexeme, self.bump.alloc(Value::Callable(f)));
+            }
+            Stmt::Return(_keyword, value) => {
+                let val = match value {
+                    Some(v) => self.evaluate_expr(v)?,
+                    None => self.bump.alloc(Value::Nil),
+                };
+                return Err(InterpretError::Return(Return { value: val }));
             }
         }
         Ok(())
@@ -522,13 +544,7 @@ impl<'a> TreewalkInterpreter<'a> {
                             .into());
                         }
 
-                        callable.call(self, arguments_slice).map_err(|message| {
-                            RuntimeError {
-                                token: paren,
-                                message,
-                            }
-                            .into()
-                        })
+                        callable.call(self, arguments_slice)
                     }
                     _ => Err(RuntimeError {
                         token: paren,
