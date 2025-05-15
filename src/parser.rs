@@ -5,7 +5,7 @@ use anyhow::Result;
 use crate::{
     expr::Stmt,
     token::{Literal, TokenType},
-    Expr, Token, Value,
+    Expr, Token,
 };
 
 use bumpalo::{collections::Vec as BVec, Bump};

@@ -53,11 +53,22 @@ struct LoxFunction<'a> {
     name: &'a Token<'a>,
     params: &'a [&'a Token<'a>],
     body: &'a Stmt<'a>,
+    closure: Rc<RefCell<Environment<'a>>>,
 }
 
 impl<'a> LoxFunction<'a> {
-    pub fn new(name: &'a Token<'a>, params: &'a [&'a Token<'a>], body: &'a Stmt<'a>) -> Self {
-        Self { name, params, body }
+    pub fn new(
+        name: &'a Token<'a>,
+        params: &'a [&'a Token<'a>],
+        body: &'a Stmt<'a>,
+        closure: Rc<RefCell<Environment<'a>>>,
+    ) -> Self {
+        Self {
+            name,
+            params,
+            body,
+            closure,
+        }
     }
 }
 
@@ -71,7 +82,7 @@ impl<'a> Callable<'a> for LoxFunction<'a> {
         interpreter: &mut TreewalkInterpreter<'a>,
         args: &'a [&'a Value<'a>],
     ) -> InterpretResult<'a, &'a Value<'a>> {
-        let mut env = Environment::with_enclosing(interpreter.env.clone());
+        let mut env = Environment::with_enclosing(Rc::clone(&self.closure));
         for i in 0..self.params.len() {
             env.define(self.params.get(i).unwrap().lexeme, args.get(i).unwrap());
         }
@@ -209,7 +220,7 @@ impl<'a> fmt::Display for Value<'a> {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 struct Environment<'a> {
     values: HashMap<&'a str, &'a Value<'a>>,
     enclosing: Option<Rc<RefCell<Environment<'a>>>>,
@@ -432,7 +443,9 @@ impl<'a> TreewalkInterpreter<'a> {
                 return Err(InterpretError::Break(Break { token }));
             }
             Stmt::Function(name, params, body) => {
-                let f = self.bump.alloc(LoxFunction::new(name, params, &body));
+                let f =
+                    self.bump
+                        .alloc(LoxFunction::new(name, params, &body, Rc::clone(&self.env)));
                 self.env
                     .borrow_mut()
                     .define(name.lexeme, self.bump.alloc(Value::Callable(f)));
