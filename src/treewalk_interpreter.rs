@@ -8,7 +8,7 @@ use bumpalo::{collections::Vec as BVec, Bump};
 
 use crate::expr::{Expr, Stmt};
 use crate::token::{Token, TokenType};
-use crate::{Interpreter, Literal, LoxError, Parser, Scanner};
+use crate::Literal;
 
 type InterpretResult<'a, T> = Result<T, InterpretError<'a>>;
 
@@ -266,7 +266,8 @@ impl<'a> Environment<'a> {
 
 pub struct TreewalkInterpreter<'a> {
     env: Rc<RefCell<Environment<'a>>>,
-    bump: &'a Bump,
+    pub bump: &'a Bump,
+    locals: HashMap<*const Expr<'a>, usize>,
 }
 
 impl<'a> TreewalkInterpreter<'a> {
@@ -286,10 +287,14 @@ impl<'a> TreewalkInterpreter<'a> {
                 },
             }))),
         );
-        Self { env, bump }
+        Self {
+            env,
+            bump,
+            locals: HashMap::new(),
+        }
     }
 
-    pub fn interpret(&mut self, stmts: BVec<'a, &'a Stmt<'a>>) -> Result<(), RuntimeError<'a>> {
+    pub fn interpret(&mut self, stmts: &BVec<'a, &'a Stmt<'a>>) -> Result<(), RuntimeError<'a>> {
         for stmt in stmts {
             match self.execute_stmt(stmt) {
                 Ok(()) => {}
@@ -303,6 +308,10 @@ impl<'a> TreewalkInterpreter<'a> {
             }
         }
         Ok(())
+    }
+
+    fn resolve(&mut self, expr: &'a Expr<'a>, depth: usize) {
+        self.locals.insert(expr as *const Expr<'a>, depth);
     }
 
     fn check_number_operand(
@@ -490,14 +499,19 @@ impl<'a> TreewalkInterpreter<'a> {
         match expr {
             Expr::Assign(token, value) => {
                 let val = self.evaluate_expr(value)?;
-                match self.env.borrow_mut().assign(token.lexeme, val) {
-                    Ok(()) => Ok(val),
-                    Err(msg) => Err(RuntimeError {
-                        token,
-                        message: msg,
-                    }
-                    .into()),
+                if let Some(&depth) = self.locals.get(&(expr as *const Expr<'a>)) {
+                    self.assign_at(depth, token.lexeme, val, token)?;
+                } else {
+                    return match self.env.borrow_mut().assign(token.lexeme, val) {
+                        Ok(()) => Ok(val),
+                        Err(msg) => Err(RuntimeError {
+                            token,
+                            message: msg,
+                        }
+                        .into()),
+                    };
                 }
+                Ok(val)
             }
             Expr::Binary(left, operator, right) => {
                 let left_val = self.evaluate_expr(left)?;
@@ -609,47 +623,254 @@ impl<'a> TreewalkInterpreter<'a> {
                     .into()),
                 }
             }
-            Expr::Variable(token) => match self.env.borrow().get(token.lexeme) {
-                Ok(v) => Ok(v),
-                Err(msg) => Err(RuntimeError {
-                    token,
-                    message: msg,
+            Expr::Variable(token) => {
+                if let Some(&depth) = self.locals.get(&(expr as *const Expr<'a>)) {
+                    return self.get_at(depth, token.lexeme, token);
                 }
-                .into()),
-            },
+                match self.env.borrow().get(token.lexeme) {
+                    Ok(v) => Ok(v),
+                    Err(msg) => Err(RuntimeError {
+                        token,
+                        message: msg,
+                    }
+                    .into()),
+                }
+            }
+        }
+    }
+
+    fn get_at(
+        &self,
+        distance: usize,
+        name: &str,
+        token: &'a Token<'a>,
+    ) -> InterpretResult<'a, &'a Value<'a>> {
+        let mut env = self.env.clone();
+        for _ in 0..distance {
+            let enclosing = env
+                .borrow()
+                .enclosing
+                .clone()
+                .ok_or(InterpretError::Runtime(RuntimeError {
+                    token,
+                    message: "No enclosing environment".to_string(),
+                }))?;
+            env = enclosing;
+        }
+        let x = match env.borrow().get(name) {
+            Ok(v) => Ok(v),
+            Err(msg) => Err(RuntimeError {
+                token,
+                message: msg,
+            }
+            .into()),
+        };
+        x
+    }
+
+    fn assign_at(
+        &self,
+        distance: usize,
+        name: &'a str,
+        value: &'a Value<'a>,
+        token: &'a Token<'a>,
+    ) -> InterpretResult<'a, ()> {
+        let mut env = self.env.clone();
+        for _ in 0..distance {
+            let enclosing = env
+                .borrow()
+                .enclosing
+                .clone()
+                .ok_or(InterpretError::Runtime(RuntimeError {
+                    token,
+                    message: "No enclosing environment".to_string(),
+                }))?;
+            env = enclosing;
+        }
+        let mut borrowed = env.borrow_mut();
+        if borrowed.values.contains_key(name) {
+            borrowed.values.insert(name, value);
+            Ok(())
+        } else {
+            Err(InterpretError::Runtime(RuntimeError {
+                token,
+                message: format!("Undefined variable '{}'.", name),
+            }))
         }
     }
 }
 
-impl<'a> Interpreter<'a> for TreewalkInterpreter<'a> {
-    fn run(&mut self, source_code: &'a str) -> Result<(), LoxError> {
-        let mut scanner = Scanner::new(&source_code, &self.bump);
+#[derive(Debug, PartialEq, Clone, Copy)]
+enum FunctionType {
+    None,
+    Function,
+}
 
-        scanner.scan_tokens();
+pub struct Resolver<'a> {
+    pub interpreter: &'a mut TreewalkInterpreter<'a>,
+    scopes: Vec<HashMap<&'a str, bool>>,
+    current_function: FunctionType,
+    pub had_error: bool,
+}
 
-        for token in &scanner.tokens {
-            if token.typ == TokenType::Error {
-                println!("[line {}] Error: Unexpected character.", token.line);
-                return Err(LoxError::CompileError);
-            }
+impl<'a> Resolver<'a> {
+    pub fn new(interpreter: &'a mut TreewalkInterpreter<'a>) -> Self {
+        Self {
+            interpreter,
+            scopes: Vec::new(),
+            current_function: FunctionType::None,
+            had_error: false,
+        }
+    }
+
+    fn error(&mut self, token: &'a Token<'a>, message: &str) {
+        eprintln!("[line {}] Error: {}", token.line, message);
+        self.had_error = true;
+    }
+
+    fn begin_scope(&mut self) {
+        self.scopes.push(HashMap::new());
+    }
+
+    fn end_scope(&mut self) {
+        self.scopes.pop();
+    }
+
+    fn declare(&mut self, name: &'a str, token: &'a Token<'a>) {
+        let alread_declare = self
+            .scopes
+            .last()
+            .map_or(false, |scope| scope.contains_key(name));
+
+        if alread_declare {
+            self.error(token, "Already a variable with this name in this scope.");
+            return;
         }
 
-        let parser = Parser::new(&scanner.tokens, &self.bump);
-        match parser.parse() {
-            Ok(stmts) => {
-                let res = self.interpret(stmts);
-                match res {
-                    Ok(v) => Ok(v),
-                    Err(e) => {
-                        eprintln!("[line {}] {}", e.token.line, e.message);
-                        Err(LoxError::RuntimeError)
-                    }
+        if let Some(scope) = self.scopes.last_mut() {
+            scope.insert(name, false);
+        }
+    }
+
+    fn define(&mut self, name: &'a str) {
+        if let Some(scope) = self.scopes.last_mut() {
+            scope.insert(name, true);
+        }
+    }
+
+    fn resolve_local(&mut self, expr: &'a Expr<'a>, token: &'a Token<'a>) {
+        for (depth, scope) in self.scopes.iter().rev().enumerate() {
+            if scope.contains_key(token.lexeme) {
+                self.interpreter.resolve(expr, depth);
+                return;
+            }
+        }
+    }
+
+    pub fn resolve(&mut self, stmts: &BVec<'a, &'a Stmt<'a>>) {
+        self.resolve_stmts(stmts);
+    }
+
+    fn resolve_stmts(&mut self, stmts: &BVec<'a, &'a Stmt<'a>>) {
+        for stmt in stmts {
+            self.resolve_stmt(stmt);
+        }
+    }
+
+    fn resolve_stmt(&mut self, stmt: &'a Stmt<'a>) {
+        match stmt {
+            Stmt::Block(stmts) => {
+                self.begin_scope();
+                self.resolve_stmts(stmts);
+                self.end_scope();
+            }
+            Stmt::Class => todo!(),
+            Stmt::Expression(expr) => self.resolve_expr(expr),
+            Stmt::Function(name, params, body) => {
+                self.declare(name.lexeme, name);
+                self.define(name.lexeme);
+                self.resolve_function(params, body);
+            }
+            Stmt::If(condition, then_stmt, else_stmt) => {
+                self.resolve_expr(condition);
+                self.resolve_stmt(then_stmt);
+                if let Some(else_stmt) = else_stmt {
+                    self.resolve_stmt(else_stmt);
                 }
             }
-            Err(e) => {
-                println!("{}", e);
-                Err(LoxError::CompileError)
+            Stmt::Print(expr) => self.resolve_expr(expr),
+            Stmt::Return(keyword, value) => {
+                if self.current_function == FunctionType::None {
+                    self.error(keyword, "Can't return from top-level code.");
+                }
+                if let Some(expr) = value {
+                    self.resolve_expr(expr);
+                }
             }
+            Stmt::Var(token, initializer) => {
+                self.declare(token.lexeme, token);
+                if let Some(init) = initializer {
+                    self.resolve_expr(init);
+                }
+                self.define(token.lexeme);
+            }
+            Stmt::While(condition, body) => {
+                self.resolve_expr(condition);
+                self.resolve_stmt(body);
+            }
+            Stmt::Break(_) => {}
+        }
+    }
+
+    fn resolve_function(&mut self, params: &'a [&'a Token<'a>], body: &'a Stmt<'a>) {
+        let enclosing_function = self.current_function;
+        self.current_function = FunctionType::Function;
+        self.begin_scope();
+        for &param in params {
+            self.declare(param.lexeme, param);
+            self.define(param.lexeme);
+        }
+        if let Stmt::Block(stmts) = body {
+            self.resolve_stmts(stmts);
+        } else {
+            panic!("Function body must be a block");
+        }
+        self.end_scope();
+        self.current_function = enclosing_function;
+    }
+
+    fn resolve_expr(&mut self, expr: &'a Expr<'a>) {
+        match expr {
+            Expr::Variable(token) => {
+                if let Some(scope) = self.scopes.last() {
+                    if let Some(&false) = scope.get(token.lexeme) {
+                        self.error(token, "Can't read local variable in its own initializer.");
+                    }
+                }
+                self.resolve_local(expr, token);
+            }
+            Expr::Assign(token, value) => {
+                self.resolve_expr(value);
+                self.resolve_local(expr, token);
+            }
+            Expr::Binary(left, _op, right) => {
+                self.resolve_expr(left);
+                self.resolve_expr(right);
+            }
+            Expr::Call(callee, _paren, args) => {
+                self.resolve_expr(callee);
+                for arg in args {
+                    self.resolve_expr(arg);
+                }
+            }
+            Expr::Grouping(expr) => self.resolve_expr(expr),
+            Expr::Literal(_) => {}
+            Expr::Logical(left, _op, right) => {
+                self.resolve_expr(left);
+                self.resolve_expr(right);
+            }
+            Expr::Unary(_op, right) => self.resolve_expr(right),
+            Expr::Get(_, _) | Expr::Set(_, _, _) | Expr::Super(_, _) | Expr::This(_) => todo!(),
         }
     }
 }
