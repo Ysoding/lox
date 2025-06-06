@@ -3,6 +3,10 @@ name = "lox"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "lox"
+path = "src/bin/lox_treewalk_interpreter.rs"
+
 [dependencies]
 anyhow = "1.0.95"
 bumpalo = { version = "3.17.0", features = ["collections"] }

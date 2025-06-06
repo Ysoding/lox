@@ -61,6 +61,9 @@ impl<'a> Parser<'a> {
     }
 
     fn declaration(&self) -> ParseResult<&'a Stmt<'a>> {
+        if self.match_one(&TokenType::Class) {
+            return self.class();
+        }
         if self.match_one(&TokenType::Fun) {
             return self.function("function");
         }
@@ -69,6 +72,19 @@ impl<'a> Parser<'a> {
         }
 
         self.statement()
+    }
+
+    fn class(&self) -> ParseResult<&'a Stmt<'a>> {
+        let name = self.consume(&TokenType::Identifier, "Expect class name.")?;
+        self.consume(&TokenType::LeftBrace, "Expect '{' before class body.")?;
+        let mut methods = BVec::new_in(&self.bump);
+
+        while !self.check(&TokenType::RightBrace) && !self.is_at_end() {
+            methods.push(self.function("method")?);
+        }
+
+        self.consume(&TokenType::RightBrace, "Expect '}' after class body.")?;
+        Ok(self.bump.alloc(Stmt::Class(name, methods)))
     }
 
     fn function(&self, kind: &str) -> ParseResult<&'a Stmt<'a>> {
@@ -280,11 +296,11 @@ impl<'a> Parser<'a> {
             let equals = self.previous();
             let value = self.assignment()?;
 
-            if let Expr::Variable(name) = expr {
-                return Ok(self.bump.alloc(Expr::Assign(name, value)));
-            }
-
-            return Err(self.error(equals, "Invalid assignment target."));
+            return match expr {
+                Expr::Get(obj, name) => Ok(self.bump.alloc(Expr::Set(obj, name, value))),
+                Expr::Variable(name) => Ok(self.bump.alloc(Expr::Assign(name, value))),
+                _ => Err(self.error(equals, "Invalid assignment target.")),
+            };
         }
 
         Ok(expr)
@@ -385,6 +401,10 @@ impl<'a> Parser<'a> {
         loop {
             if self.match_one(&TokenType::LeftParen) {
                 expr = self.finish_call(expr)?;
+            } else if self.match_one(&TokenType::Dot) {
+                let name =
+                    self.consume(&TokenType::Identifier, "Expect property name after '.'.")?;
+                expr = self.bump.alloc(Expr::Get(expr, name));
             } else {
                 break;
             }

@@ -12,10 +12,10 @@ use crate::Literal;
 
 type InterpretResult<'a, T> = Result<T, InterpretError<'a>>;
 
-pub trait Callable<'a>: ToString + Debug {
+trait Callable<'a>: ToString + Debug {
     fn arity(&self) -> usize;
     fn call(
-        &self,
+        &'a self,
         interpreter: &mut TreewalkInterpreter<'a>,
         args: &'a [&'a Value<'a>],
     ) -> InterpretResult<'a, &'a Value<'a>>;
@@ -45,6 +45,81 @@ impl<'a> Callable<'a> for NativeFunction<'a> {
 impl<'a> ToString for NativeFunction<'a> {
     fn to_string(&self) -> String {
         "<native fn>".to_string()
+    }
+}
+
+#[derive(Clone, Debug)]
+struct LoxClass<'a> {
+    name: &'a Token<'a>,
+    methods: HashMap<&'a str, &'a Value<'a>>,
+}
+
+impl<'a> LoxClass<'a> {
+    fn find_method(&self, name: &str) -> Option<&&'a Value<'a>> {
+        self.methods.get(name)
+    }
+}
+
+impl<'a> Callable<'a> for LoxClass<'a> {
+    fn arity(&self) -> usize {
+        0
+    }
+
+    fn call(
+        &'a self,
+        interpreter: &mut TreewalkInterpreter<'a>,
+        _args: &'a [&'a Value<'a>],
+    ) -> InterpretResult<'a, &'a Value<'a>> {
+        let instance = interpreter.bump.alloc(LoxInstance::new(self));
+        let value = interpreter.bump.alloc(Value::Instance(instance));
+        Ok(value)
+    }
+}
+
+impl<'a> ToString for LoxClass<'a> {
+    fn to_string(&self) -> String {
+        format!("{}", self.name.lexeme)
+    }
+}
+
+#[derive(Clone, Debug)]
+struct LoxInstance<'a> {
+    class: &'a LoxClass<'a>,
+    fields: RefCell<HashMap<&'a str, &'a Value<'a>>>,
+}
+
+impl<'a> LoxInstance<'a> {
+    fn new(class: &'a LoxClass<'a>) -> Self {
+        Self {
+            class,
+            fields: RefCell::new(HashMap::default()),
+        }
+    }
+
+    fn get(&self, name: &'a Token<'a>) -> InterpretResult<'a, &'a Value<'a>> {
+        if self.fields.borrow().contains_key(name.lexeme) {
+            return Ok(self.fields.borrow().get(name.lexeme).unwrap());
+        }
+
+        if let Some(m) = self.class.find_method(name.lexeme) {
+            return Ok(m);
+        }
+
+        Err(RuntimeError {
+            token: name,
+            message: format!("Undefined property '{}'.", name.lexeme),
+        }
+        .into())
+    }
+
+    fn set(&self, name: &'a Token<'a>, value: &'a Value<'a>) {
+        self.fields.borrow_mut().insert(name.lexeme, value);
+    }
+}
+
+impl<'a> ToString for LoxInstance<'a> {
+    fn to_string(&self) -> String {
+        format!("{} instance", self.class.name.lexeme)
     }
 }
 
@@ -150,11 +225,12 @@ impl<'a> From<InterpretError<'a>> for RuntimeError<'a> {
 }
 
 #[derive(Clone, Debug)]
-pub enum Value<'a> {
+enum Value<'a> {
     Number(f64),
     String(&'a str),
     Boolean(bool),
     Callable(&'a dyn Callable<'a>),
+    Instance(&'a LoxInstance<'a>),
     Nil,
 }
 
@@ -214,6 +290,9 @@ impl<'a> fmt::Display for Value<'a> {
             }
             Value::Callable(callable) => {
                 f.write_str(&callable.to_string())?;
+            }
+            Value::Instance(lox_instance) => {
+                f.write_str(&lox_instance.to_string())?;
             }
         };
         Ok(())
@@ -413,7 +492,6 @@ impl<'a> TreewalkInterpreter<'a> {
 
     fn execute_stmt(&mut self, stmt: &'a Stmt<'a>) -> InterpretResult<'a, ()> {
         match stmt {
-            Stmt::Class => todo!(),
             Stmt::Expression(expr) => {
                 let _value = self.evaluate_expr(expr)?;
             }
@@ -465,6 +543,43 @@ impl<'a> TreewalkInterpreter<'a> {
                     None => self.bump.alloc(Value::Nil),
                 };
                 return Err(InterpretError::Return(Return { value: val }));
+            }
+            Stmt::Class(name, methods) => {
+                let mut env = self.env.borrow_mut();
+
+                env.define(name.lexeme, self.bump.alloc(Value::Nil));
+
+                let mut c_methods = HashMap::new();
+                for method in methods {
+                    if let Stmt::Function(name, params, body) = method {
+                        let f =
+                            self.bump
+                                .alloc(Value::Callable(self.bump.alloc(LoxFunction::new(
+                                    name,
+                                    params,
+                                    &body,
+                                    Rc::clone(&self.env),
+                                ))));
+                        c_methods.insert(name.lexeme, &*f);
+                    } else {
+                        panic!("expected function statement");
+                    }
+                }
+
+                let class = self.bump.alloc(Value::Callable(self.bump.alloc(LoxClass {
+                    name,
+                    methods: c_methods,
+                })));
+                match env.assign(name.lexeme, class) {
+                    Ok(()) => {}
+                    Err(msg) => {
+                        return Err(RuntimeError {
+                            message: msg,
+                            token: name,
+                        }
+                        .into())
+                    }
+                }
             }
         }
         Ok(())
@@ -580,7 +695,17 @@ impl<'a> TreewalkInterpreter<'a> {
                     .into()),
                 }
             }
-            Expr::Get(expr, token) => todo!(),
+            Expr::Get(expr, name) => {
+                let obj = self.evaluate_expr(expr)?;
+                match obj {
+                    Value::Instance(lox_instance) => lox_instance.get(name),
+                    _ => Err(RuntimeError {
+                        token: name,
+                        message: "Only instances have properties.".to_string(),
+                    }
+                    .into()),
+                }
+            }
             Expr::Grouping(expr) => self.evaluate_expr(expr),
             Expr::Literal(literal) => Ok(self.bump.alloc(Value::from(literal))),
             Expr::Logical(left_expr, operator, right_expr) => {
@@ -601,7 +726,22 @@ impl<'a> TreewalkInterpreter<'a> {
 
                 self.evaluate_expr(right_expr)
             }
-            Expr::Set(expr, token, expr1) => todo!(),
+            Expr::Set(obj, name, value) => {
+                let obj = self.evaluate_expr(obj)?;
+
+                match obj {
+                    Value::Instance(lox_instance) => {
+                        let value = self.evaluate_expr(value)?;
+                        lox_instance.set(name, value);
+                        Ok(value)
+                    }
+                    _ => Err(RuntimeError {
+                        token: name,
+                        message: "Only instances have properties.".to_string(),
+                    }
+                    .into()),
+                }
+            }
             Expr::Super(token, token1) => todo!(),
             Expr::This(token) => todo!(),
             Expr::Unary(operator, right) => {
@@ -704,6 +844,7 @@ impl<'a> TreewalkInterpreter<'a> {
 enum FunctionType {
     None,
     Function,
+    Method,
 }
 
 pub struct Resolver<'a> {
@@ -784,12 +925,11 @@ impl<'a> Resolver<'a> {
                 self.resolve_stmts(stmts);
                 self.end_scope();
             }
-            Stmt::Class => todo!(),
             Stmt::Expression(expr) => self.resolve_expr(expr),
             Stmt::Function(name, params, body) => {
                 self.declare(name.lexeme, name);
                 self.define(name.lexeme);
-                self.resolve_function(params, body);
+                self.resolve_function(params, body, FunctionType::Function);
             }
             Stmt::If(condition, then_stmt, else_stmt) => {
                 self.resolve_expr(condition);
@@ -819,12 +959,28 @@ impl<'a> Resolver<'a> {
                 self.resolve_stmt(body);
             }
             Stmt::Break(_) => {}
+            Stmt::Class(name, methods) => {
+                self.declare(name.lexeme, name);
+                self.define(name.lexeme);
+                for method in methods {
+                    if let Stmt::Function(_name, params, body) = method {
+                        self.resolve_function(params, body, FunctionType::Method);
+                    } else {
+                        panic!("unexpected method type");
+                    }
+                }
+            }
         }
     }
 
-    fn resolve_function(&mut self, params: &'a [&'a Token<'a>], body: &'a Stmt<'a>) {
+    fn resolve_function(
+        &mut self,
+        params: &'a [&'a Token<'a>],
+        body: &'a Stmt<'a>,
+        f_type: FunctionType,
+    ) {
         let enclosing_function = self.current_function;
-        self.current_function = FunctionType::Function;
+        self.current_function = f_type;
         self.begin_scope();
         for &param in params {
             self.declare(param.lexeme, param);
@@ -870,7 +1026,14 @@ impl<'a> Resolver<'a> {
                 self.resolve_expr(right);
             }
             Expr::Unary(_op, right) => self.resolve_expr(right),
-            Expr::Get(_, _) | Expr::Set(_, _, _) | Expr::Super(_, _) | Expr::This(_) => todo!(),
+            Expr::Get(object, _name) => {
+                self.resolve_expr(object);
+            }
+            Expr::Set(obj, _name, value) => {
+                self.resolve_expr(value);
+                self.resolve_expr(obj);
+            }
+            Expr::Super(_, _) | Expr::This(_) => todo!(),
         }
     }
 }

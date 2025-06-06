@@ -4,7 +4,7 @@ use crate::token::*;
 #[derive(Debug)]
 pub enum Stmt<'a> {
     Block(bumpalo::collections::Vec<'a, &'a Stmt<'a>>),
-    Class,
+    Class(&'a Token<'a>, bumpalo::collections::Vec<'a, &'a Stmt<'a>>),
     Expression(&'a Expr<'a>),
     Function(
         &'a Token<'a>,
