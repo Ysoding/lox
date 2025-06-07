@@ -77,7 +77,7 @@ impl<'a> Parser<'a> {
     fn class(&self) -> ParseResult<&'a Stmt<'a>> {
         let name = self.consume(&TokenType::Identifier, "Expect class name.")?;
         self.consume(&TokenType::LeftBrace, "Expect '{' before class body.")?;
-        let mut methods = BVec::new_in(&self.bump);
+        let mut methods = BVec::new_in(self.bump);
 
         while !self.check(&TokenType::RightBrace) && !self.is_at_end() {
             methods.push(self.function("method")?);
@@ -93,7 +93,7 @@ impl<'a> Parser<'a> {
             &TokenType::LeftParen,
             &format!("Expect '(' after {} name.", kind),
         )?;
-        let mut parameters = BVec::new_in(&self.bump);
+        let mut parameters = BVec::new_in(self.bump);
         if !self.check(&TokenType::RightParen) {
             loop {
                 if parameters.len() >= 255 {
@@ -413,7 +413,7 @@ impl<'a> Parser<'a> {
     }
 
     fn finish_call(&self, callee: &'a Expr<'a>) -> ParseResult<&'a Expr<'a>> {
-        let mut args = BVec::new_in(&self.bump);
+        let mut args = BVec::new_in(self.bump);
         if !self.check(&TokenType::RightParen) {
             loop {
                 if args.len() >= 255 {

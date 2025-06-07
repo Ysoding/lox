@@ -1,6 +1,6 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::fmt::{self, Debug};
+use std::fmt::{self, Debug, Display};
 use std::rc::Rc;
 
 use anyhow::Result;
@@ -42,9 +42,9 @@ impl<'a> Callable<'a> for NativeFunction<'a> {
     }
 }
 
-impl<'a> ToString for NativeFunction<'a> {
-    fn to_string(&self) -> String {
-        "<native fn>".to_string()
+impl<'a> Display for NativeFunction<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "<native fn>")
     }
 }
 
@@ -76,9 +76,9 @@ impl<'a> Callable<'a> for LoxClass<'a> {
     }
 }
 
-impl<'a> ToString for LoxClass<'a> {
-    fn to_string(&self) -> String {
-        format!("{}", self.name.lexeme)
+impl<'a> Display for LoxClass<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.name.lexeme)
     }
 }
 
@@ -117,9 +117,9 @@ impl<'a> LoxInstance<'a> {
     }
 }
 
-impl<'a> ToString for LoxInstance<'a> {
-    fn to_string(&self) -> String {
-        format!("{} instance", self.class.name.lexeme)
+impl<'a> Display for LoxInstance<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} instance", self.class.name.lexeme)
     }
 }
 
@@ -162,17 +162,11 @@ impl<'a> Callable<'a> for LoxFunction<'a> {
             env.define(self.params.get(i).unwrap().lexeme, args.get(i).unwrap());
         }
         match self.body {
-            Stmt::Block(stmts) => match interpreter.execute_block(&stmts, env) {
-                Ok(v) => {
-                    return Ok(v);
-                }
+            Stmt::Block(stmts) => match interpreter.execute_block(stmts, env) {
+                Ok(v) => Ok(v),
                 Err(err) => match err {
-                    InterpretError::Return(v) => {
-                        return Ok(v.value);
-                    }
-                    _ => {
-                        return Err(err);
-                    }
+                    InterpretError::Return(v) => Ok(v.value),
+                    _ => Err(err),
                 },
             },
             _ => panic!("Expect Block"),
@@ -180,9 +174,9 @@ impl<'a> Callable<'a> for LoxFunction<'a> {
     }
 }
 
-impl<'a> ToString for LoxFunction<'a> {
-    fn to_string(&self) -> String {
-        format!("<fn {}>", self.name.lexeme)
+impl<'a> Display for LoxFunction<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "<fn {}>", self.name.lexeme)
     }
 }
 
@@ -436,7 +430,7 @@ impl<'a> TreewalkInterpreter<'a> {
     where
         F: Fn(f64, f64) -> f64,
     {
-        self.check_number_operands(token, &a, &b)?;
+        self.check_number_operands(token, a, b)?;
         if let (Value::Number(a_val), Value::Number(b_val)) = (a, b) {
             Ok(self.bump.alloc(Value::Number(op(*a_val, *b_val))))
         } else {
@@ -459,7 +453,7 @@ impl<'a> TreewalkInterpreter<'a> {
     where
         F: Fn(f64, f64) -> bool,
     {
-        self.check_number_operands(token, &a, &b)?;
+        self.check_number_operands(token, a, b)?;
         if let (Value::Number(a_val), Value::Number(b_val)) = (a, b) {
             Ok(self.bump.alloc(Value::Boolean(op(*a_val, *b_val))))
         } else {
@@ -530,9 +524,9 @@ impl<'a> TreewalkInterpreter<'a> {
                 return Err(InterpretError::Break(Break { token }));
             }
             Stmt::Function(name, params, body) => {
-                let f =
-                    self.bump
-                        .alloc(LoxFunction::new(name, params, &body, Rc::clone(&self.env)));
+                let f = self
+                    .bump
+                    .alloc(LoxFunction::new(name, params, body, Rc::clone(&self.env)));
                 self.env
                     .borrow_mut()
                     .define(name.lexeme, self.bump.alloc(Value::Callable(f)));
@@ -557,7 +551,7 @@ impl<'a> TreewalkInterpreter<'a> {
                                 .alloc(Value::Callable(self.bump.alloc(LoxFunction::new(
                                     name,
                                     params,
-                                    &body,
+                                    body,
                                     Rc::clone(&self.env),
                                 ))));
                         c_methods.insert(name.lexeme, &*f);
@@ -650,10 +644,10 @@ impl<'a> TreewalkInterpreter<'a> {
                     }
                     TokenType::BangEqual => Ok(self
                         .bump
-                        .alloc(Value::Boolean(!left_val.is_equal(&right_val)))),
+                        .alloc(Value::Boolean(!left_val.is_equal(right_val)))),
                     TokenType::EqualEqual => Ok(self
                         .bump
-                        .alloc(Value::Boolean(left_val.is_equal(&right_val)))),
+                        .alloc(Value::Boolean(left_val.is_equal(right_val)))),
                     _ => Err(RuntimeError {
                         token: operator,
                         message: "Unsupported operator.".to_string(),
@@ -662,7 +656,7 @@ impl<'a> TreewalkInterpreter<'a> {
                 }
             }
             Expr::Call(callee, paren, args) => {
-                let callee = self.evaluate_expr(&callee)?;
+                let callee = self.evaluate_expr(callee)?;
 
                 let arguments: Vec<_> = args
                     .iter()
@@ -881,7 +875,7 @@ impl<'a> Resolver<'a> {
         let alread_declare = self
             .scopes
             .last()
-            .map_or(false, |scope| scope.contains_key(name));
+            .is_some_and(|scope| scope.contains_key(name));
 
         if alread_declare {
             self.error(token, "Already a variable with this name in this scope.");

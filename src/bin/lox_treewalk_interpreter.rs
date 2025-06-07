@@ -52,7 +52,7 @@ fn run_file(file_path: PathBuf) {
 // }
 
 fn run<'a>(resolver: &'a mut Resolver<'a>, source_code: &'a str) -> Result<(), LoxError> {
-    let mut scanner = Scanner::new(&source_code, &resolver.interpreter.bump);
+    let mut scanner = Scanner::new(source_code, resolver.interpreter.bump);
 
     scanner.scan_tokens();
 
@@ -63,7 +63,7 @@ fn run<'a>(resolver: &'a mut Resolver<'a>, source_code: &'a str) -> Result<(), L
         }
     }
 
-    let parser = Parser::new(&scanner.tokens, &resolver.interpreter.bump);
+    let parser = Parser::new(&scanner.tokens, resolver.interpreter.bump);
     match parser.parse() {
         Ok(stmts) => {
             resolver.resolve(&stmts);
