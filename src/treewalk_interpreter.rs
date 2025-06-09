@@ -1,6 +1,6 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::fmt::{self, Debug, Display};
+use std::fmt::{self, Debug};
 use std::rc::Rc;
 
 use anyhow::Result;
@@ -12,7 +12,7 @@ use crate::Literal;
 
 type InterpretResult<'a, T> = Result<T, InterpretError<'a>>;
 
-trait Callable<'a>: ToString + Debug {
+trait Callable<'a> {
     fn arity(&self) -> usize;
     fn call(
         &'a self,
@@ -42,12 +42,6 @@ impl<'a> Callable<'a> for NativeFunction<'a> {
     }
 }
 
-impl<'a> Display for NativeFunction<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "<native fn>")
-    }
-}
-
 #[derive(Clone, Debug)]
 struct LoxClass<'a> {
     name: &'a Token<'a>,
@@ -73,12 +67,6 @@ impl<'a> Callable<'a> for LoxClass<'a> {
         let instance = interpreter.bump.alloc(LoxInstance::new(self));
         let value = interpreter.bump.alloc(Value::Instance(instance));
         Ok(value)
-    }
-}
-
-impl<'a> Display for LoxClass<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.name.lexeme)
     }
 }
 
@@ -114,12 +102,6 @@ impl<'a> LoxInstance<'a> {
 
     fn set(&self, name: &'a Token<'a>, value: &'a Value<'a>) {
         self.fields.borrow_mut().insert(name.lexeme, value);
-    }
-}
-
-impl<'a> Display for LoxInstance<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{} instance", self.class.name.lexeme)
     }
 }
 
@@ -174,12 +156,6 @@ impl<'a> Callable<'a> for LoxFunction<'a> {
     }
 }
 
-impl<'a> Display for LoxFunction<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "<fn {}>", self.name.lexeme)
-    }
-}
-
 #[derive(Debug)]
 pub enum InterpretError<'a> {
     Runtime(RuntimeError<'a>),
@@ -223,8 +199,10 @@ enum Value<'a> {
     Number(f64),
     String(&'a str),
     Boolean(bool),
-    Callable(&'a dyn Callable<'a>),
     Instance(&'a LoxInstance<'a>),
+    NativeFunction(&'a NativeFunction<'a>),
+    Function(&'a LoxFunction<'a>),
+    Class(&'a LoxClass<'a>),
     Nil,
 }
 
@@ -282,11 +260,17 @@ impl<'a> fmt::Display for Value<'a> {
             Value::Nil => {
                 f.write_str("nil")?;
             }
-            Value::Callable(callable) => {
-                f.write_str(&callable.to_string())?;
+            Value::NativeFunction(_native_fn) => {
+                write!(f, "<native fn>")?;
+            }
+            Value::Function(lox_fn) => {
+                write!(f, "<fn {}>", lox_fn.name.lexeme)?;
+            }
+            Value::Class(lox_class) => {
+                write!(f, "{}", lox_class.name.lexeme)?;
             }
             Value::Instance(lox_instance) => {
-                f.write_str(&lox_instance.to_string())?;
+                write!(f, "{} instance", lox_instance.class.name.lexeme)?;
             }
         };
         Ok(())
@@ -348,7 +332,7 @@ impl<'a> TreewalkInterpreter<'a> {
         let env = Rc::new(RefCell::new(Environment::default()));
         env.borrow_mut().define(
             "clock",
-            bump.alloc(Value::Callable(bump.alloc(NativeFunction {
+            bump.alloc(Value::NativeFunction(bump.alloc(NativeFunction {
                 arit: 0,
                 callable: |interpreter: &mut TreewalkInterpreter<'a>,
                            _args: &'a [&'a Value<'a>]| {
@@ -529,7 +513,7 @@ impl<'a> TreewalkInterpreter<'a> {
                     .alloc(LoxFunction::new(name, params, body, Rc::clone(&self.env)));
                 self.env
                     .borrow_mut()
-                    .define(name.lexeme, self.bump.alloc(Value::Callable(f)));
+                    .define(name.lexeme, self.bump.alloc(Value::Function(f)));
             }
             Stmt::Return(_keyword, value) => {
                 let val = match value {
@@ -548,7 +532,7 @@ impl<'a> TreewalkInterpreter<'a> {
                     if let Stmt::Function(name, params, body) = method {
                         let f =
                             self.bump
-                                .alloc(Value::Callable(self.bump.alloc(LoxFunction::new(
+                                .alloc(Value::Function(self.bump.alloc(LoxFunction::new(
                                     name,
                                     params,
                                     body,
@@ -560,7 +544,7 @@ impl<'a> TreewalkInterpreter<'a> {
                     }
                 }
 
-                let class = self.bump.alloc(Value::Callable(self.bump.alloc(LoxClass {
+                let class = self.bump.alloc(Value::Class(self.bump.alloc(LoxClass {
                     name,
                     methods: c_methods,
                 })));
@@ -665,29 +649,20 @@ impl<'a> TreewalkInterpreter<'a> {
 
                 let arguments_slice = self.bump.alloc_slice_copy(&arguments);
 
-                match callee {
-                    Value::Callable(callable) => {
-                        // Call the function
-                        if callable.arity() != arguments.len() {
-                            return Err(RuntimeError {
-                                token: paren,
-                                message: format!(
-                                    "Expected {} arguments but got {}.",
-                                    callable.arity(),
-                                    arguments.len()
-                                ),
-                            }
-                            .into());
+                let callable: &dyn Callable<'a> = match callee {
+                    Value::NativeFunction(native_fn) => *native_fn,
+                    Value::Function(lox_fn) => *lox_fn,
+                    Value::Class(lox_class) => *lox_class,
+                    _ => {
+                        return Err(RuntimeError {
+                            token: paren,
+                            message: "Can only call functions and classes.".to_string(),
                         }
+                        .into())
+                    }
+                };
 
-                        callable.call(self, arguments_slice)
-                    }
-                    _ => Err(RuntimeError {
-                        token: paren,
-                        message: "Can only call functions and classes.".to_string(),
-                    }
-                    .into()),
-                }
+                self.call_with_arity_check(callable, arguments_slice, paren)
             }
             Expr::Get(expr, name) => {
                 let obj = self.evaluate_expr(expr)?;
@@ -771,6 +746,26 @@ impl<'a> TreewalkInterpreter<'a> {
                 }
             }
         }
+    }
+
+    fn call_with_arity_check(
+        &mut self,
+        callable: &'a dyn Callable<'a>,
+        args: &'a [&'a Value<'a>],
+        paren: &'a Token<'a>,
+    ) -> InterpretResult<'a, &'a Value<'a>> {
+        if callable.arity() != args.len() {
+            return Err(RuntimeError {
+                token: paren,
+                message: format!(
+                    "Expected {} arguments but got {}.",
+                    callable.arity(),
+                    args.len()
+                ),
+            }
+            .into());
+        }
+        callable.call(self, args)
     }
 
     fn get_at(
