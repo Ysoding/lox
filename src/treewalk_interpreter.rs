@@ -1,6 +1,6 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::fmt::{self, Debug, DebugList, Display};
+use std::fmt::{self, Debug, Display};
 use std::rc::Rc;
 
 use anyhow::Result;
