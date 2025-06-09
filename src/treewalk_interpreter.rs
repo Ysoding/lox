@@ -42,6 +42,12 @@ impl<'a> Callable<'a> for NativeFunction<'a> {
     }
 }
 
+#[derive(PartialEq, Clone, Copy, Debug)]
+enum ClassType {
+    None,
+    Class,
+}
+
 #[derive(Clone, Debug)]
 struct LoxClass<'a> {
     name: &'a Token<'a>,
@@ -84,13 +90,24 @@ impl<'a> LoxInstance<'a> {
         }
     }
 
-    fn get(&self, name: &'a Token<'a>) -> InterpretResult<'a, &'a Value<'a>> {
+    fn get(
+        &'a self,
+        name: &'a Token<'a>,
+        interpreter: &mut TreewalkInterpreter<'a>,
+    ) -> InterpretResult<'a, &'a Value<'a>> {
         if self.fields.borrow().contains_key(name.lexeme) {
             return Ok(self.fields.borrow().get(name.lexeme).unwrap());
         }
 
         if let Some(m) = self.class.find_method(name.lexeme) {
-            return Ok(m);
+            match m {
+                Value::Function(method) => {
+                    return Ok(interpreter
+                        .bump
+                        .alloc(Value::Function(method.bind(self, interpreter))));
+                }
+                _ => return Ok(m),
+            }
         }
 
         Err(RuntimeError {
@@ -126,6 +143,23 @@ impl<'a> LoxFunction<'a> {
             body,
             closure,
         }
+    }
+
+    pub fn bind(
+        &self,
+        instance: &'a LoxInstance<'a>,
+        interpreter: &mut TreewalkInterpreter<'a>,
+    ) -> &'a LoxFunction<'a> {
+        let mut environment = Environment::with_enclosing(Rc::clone(&self.closure));
+
+        environment.define("this", interpreter.bump.alloc(Value::Instance(instance)));
+
+        interpreter.bump.alloc(LoxFunction::new(
+            self.name,
+            self.params,
+            self.body,
+            Rc::new(RefCell::new(environment)),
+        ))
     }
 }
 
@@ -587,6 +621,24 @@ impl<'a> TreewalkInterpreter<'a> {
         result
     }
 
+    fn look_up_variable(
+        &mut self,
+        name: &'a Token,
+        expr: &'a Expr<'a>,
+    ) -> InterpretResult<'a, &'a Value<'a>> {
+        if let Some(&depth) = self.locals.get(&(expr as *const Expr<'a>)) {
+            return self.get_at(depth, name.lexeme, name);
+        }
+        match self.env.borrow().get(name.lexeme) {
+            Ok(v) => Ok(v),
+            Err(msg) => Err(RuntimeError {
+                token: name,
+                message: msg,
+            }
+            .into()),
+        }
+    }
+
     #[allow(unused)]
     fn evaluate_expr(&mut self, expr: &'a Expr<'a>) -> InterpretResult<'a, &'a Value<'a>> {
         match expr {
@@ -667,7 +719,7 @@ impl<'a> TreewalkInterpreter<'a> {
             Expr::Get(expr, name) => {
                 let obj = self.evaluate_expr(expr)?;
                 match obj {
-                    Value::Instance(lox_instance) => lox_instance.get(name),
+                    Value::Instance(lox_instance) => lox_instance.get(name, self),
                     _ => Err(RuntimeError {
                         token: name,
                         message: "Only instances have properties.".to_string(),
@@ -712,7 +764,6 @@ impl<'a> TreewalkInterpreter<'a> {
                 }
             }
             Expr::Super(token, token1) => todo!(),
-            Expr::This(token) => todo!(),
             Expr::Unary(operator, right) => {
                 let right_val = self.evaluate_expr(right)?;
                 match operator.typ {
@@ -732,19 +783,8 @@ impl<'a> TreewalkInterpreter<'a> {
                     .into()),
                 }
             }
-            Expr::Variable(token) => {
-                if let Some(&depth) = self.locals.get(&(expr as *const Expr<'a>)) {
-                    return self.get_at(depth, token.lexeme, token);
-                }
-                match self.env.borrow().get(token.lexeme) {
-                    Ok(v) => Ok(v),
-                    Err(msg) => Err(RuntimeError {
-                        token,
-                        message: msg,
-                    }
-                    .into()),
-                }
-            }
+            Expr::Variable(token) => self.look_up_variable(token, expr),
+            Expr::This(token) => self.look_up_variable(token, expr),
         }
     }
 
@@ -840,6 +880,7 @@ pub struct Resolver<'a> {
     pub interpreter: &'a mut TreewalkInterpreter<'a>,
     scopes: Vec<HashMap<&'a str, bool>>,
     current_function: FunctionType,
+    current_class: ClassType,
     pub had_error: bool,
 }
 
@@ -850,6 +891,7 @@ impl<'a> Resolver<'a> {
             scopes: Vec::new(),
             current_function: FunctionType::None,
             had_error: false,
+            current_class: ClassType::None,
         }
     }
 
@@ -949,8 +991,15 @@ impl<'a> Resolver<'a> {
             }
             Stmt::Break(_) => {}
             Stmt::Class(name, methods) => {
+                let enclosing_class = self.current_class;
+                self.current_class = ClassType::Class;
+
                 self.declare(name.lexeme, name);
                 self.define(name.lexeme);
+
+                self.begin_scope();
+                self.scopes.last_mut().unwrap().insert("this", true);
+
                 for method in methods {
                     if let Stmt::Function(_name, params, body) = method {
                         self.resolve_function(params, body, FunctionType::Method);
@@ -958,6 +1007,9 @@ impl<'a> Resolver<'a> {
                         panic!("unexpected method type");
                     }
                 }
+
+                self.end_scope();
+                self.current_class = enclosing_class;
             }
         }
     }
@@ -1022,7 +1074,14 @@ impl<'a> Resolver<'a> {
                 self.resolve_expr(value);
                 self.resolve_expr(obj);
             }
-            Expr::Super(_, _) | Expr::This(_) => todo!(),
+            Expr::This(keyword) => {
+                if self.current_class == ClassType::None {
+                    self.error(keyword, "Can't use 'this' outside of a class.");
+                    return;
+                }
+                self.resolve_local(expr, keyword);
+            }
+            Expr::Super(_, _) => todo!(),
         }
     }
 }

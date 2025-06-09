@@ -467,6 +467,10 @@ impl<'a> Parser<'a> {
             return Ok(self.bump.alloc(Expr::Variable(self.previous())));
         }
 
+        if self.match_one(&TokenType::This) {
+            return Ok(self.bump.alloc(Expr::This(self.previous())));
+        }
+
         Err(self.error(self.peek(), "Expect expression."))
     }
 
