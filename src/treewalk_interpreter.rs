@@ -1,6 +1,6 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::fmt::{self, Debug};
+use std::fmt::{self, Debug, DebugList, Display};
 use std::rc::Rc;
 
 use anyhow::Result;
@@ -62,17 +62,24 @@ impl<'a> LoxClass<'a> {
 
 impl<'a> Callable<'a> for LoxClass<'a> {
     fn arity(&self) -> usize {
+        if let Some(Value::Function(initializer)) = self.find_method("init") {
+            return initializer.arity();
+        }
         0
     }
 
     fn call(
         &'a self,
         interpreter: &mut TreewalkInterpreter<'a>,
-        _args: &'a [&'a Value<'a>],
+        args: &'a [&'a Value<'a>],
     ) -> InterpretResult<'a, &'a Value<'a>> {
         let instance = interpreter.bump.alloc(LoxInstance::new(self));
-        let value = interpreter.bump.alloc(Value::Instance(instance));
-        Ok(value)
+        if let Some(Value::Function(initializer)) = self.find_method("init") {
+            initializer
+                .bind(instance, interpreter)
+                .call(interpreter, args)?;
+        }
+        Ok(interpreter.bump.alloc(Value::Instance(instance)))
     }
 }
 
@@ -128,6 +135,7 @@ struct LoxFunction<'a> {
     params: &'a [&'a Token<'a>],
     body: &'a Stmt<'a>,
     closure: Rc<RefCell<Environment<'a>>>,
+    is_initializer: bool,
 }
 
 impl<'a> LoxFunction<'a> {
@@ -136,12 +144,14 @@ impl<'a> LoxFunction<'a> {
         params: &'a [&'a Token<'a>],
         body: &'a Stmt<'a>,
         closure: Rc<RefCell<Environment<'a>>>,
+        is_initializer: bool,
     ) -> Self {
         Self {
             name,
             params,
             body,
             closure,
+            is_initializer,
         }
     }
 
@@ -152,13 +162,15 @@ impl<'a> LoxFunction<'a> {
     ) -> &'a LoxFunction<'a> {
         let mut environment = Environment::with_enclosing(Rc::clone(&self.closure));
 
-        environment.define("this", interpreter.bump.alloc(Value::Instance(instance)));
+        let this = interpreter.bump.alloc(Value::Instance(instance));
+        environment.define("this", this);
 
         interpreter.bump.alloc(LoxFunction::new(
             self.name,
             self.params,
             self.body,
             Rc::new(RefCell::new(environment)),
+            self.is_initializer,
         ))
     }
 }
@@ -179,9 +191,19 @@ impl<'a> Callable<'a> for LoxFunction<'a> {
         }
         match self.body {
             Stmt::Block(stmts) => match interpreter.execute_block(stmts, env) {
-                Ok(v) => Ok(v),
+                Ok(v) => {
+                    if self.is_initializer {
+                        return Ok(get_at(self.closure.clone(), 0, "this").unwrap());
+                    }
+                    Ok(v)
+                }
                 Err(err) => match err {
-                    InterpretError::Return(v) => Ok(v.value),
+                    InterpretError::Return(v) => {
+                        if self.is_initializer {
+                            return Ok(get_at(self.closure.clone(), 0, "this").unwrap());
+                        }
+                        Ok(v.value)
+                    }
                     _ => Err(err),
                 },
             },
@@ -317,6 +339,17 @@ struct Environment<'a> {
     enclosing: Option<Rc<RefCell<Environment<'a>>>>,
 }
 
+impl<'a> Display for Environment<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let values_str = format!("{:?}", self.values);
+        write!(f, "{}", values_str)?;
+        if let Some(enclosing) = &self.enclosing {
+            write!(f, " -> {}", enclosing.borrow())?;
+        }
+        Ok(())
+    }
+}
+
 impl<'a> Environment<'a> {
     fn with_enclosing(enclosing: Rc<RefCell<Environment<'a>>>) -> Self {
         Self {
@@ -329,7 +362,7 @@ impl<'a> Environment<'a> {
         self.values.insert(name, value);
     }
 
-    fn get(&self, name: &str) -> Result<&'a Value<'a>, String> {
+    fn get(&self, name: &'a str) -> Result<&'a Value<'a>, String> {
         if self.values.contains_key(name) {
             return Ok(self.values.get(name).unwrap());
         }
@@ -341,9 +374,13 @@ impl<'a> Environment<'a> {
         Err(format!("Undefined variable '{}'.", name))
     }
 
-    fn assign(&mut self, name: &'a str, val: &'a Value<'a>) -> Result<(), String> {
-        if self.values.contains_key(name) {
-            self.values.insert(name, val);
+    fn assign(
+        &mut self,
+        name: &'a Token<'a>,
+        val: &'a Value<'a>,
+    ) -> Result<(), InterpretError<'a>> {
+        if self.values.contains_key(name.lexeme) {
+            self.values.insert(name.lexeme, val);
             return Ok(());
         }
 
@@ -351,7 +388,11 @@ impl<'a> Environment<'a> {
             return enclosing.borrow_mut().assign(name, val);
         }
 
-        Err(format!("Undefined variable '{}'.", name))
+        Err(RuntimeError {
+            message: format!("Undefined variable '{}'.", name.lexeme),
+            token: name,
+        }
+        .into())
     }
 }
 
@@ -542,9 +583,13 @@ impl<'a> TreewalkInterpreter<'a> {
                 return Err(InterpretError::Break(Break { token }));
             }
             Stmt::Function(name, params, body) => {
-                let f = self
-                    .bump
-                    .alloc(LoxFunction::new(name, params, body, Rc::clone(&self.env)));
+                let f = self.bump.alloc(LoxFunction::new(
+                    name,
+                    params,
+                    body,
+                    Rc::clone(&self.env),
+                    false,
+                ));
                 self.env
                     .borrow_mut()
                     .define(name.lexeme, self.bump.alloc(Value::Function(f)));
@@ -571,6 +616,7 @@ impl<'a> TreewalkInterpreter<'a> {
                                     params,
                                     body,
                                     Rc::clone(&self.env),
+                                    name.lexeme.eq("init"),
                                 ))));
                         c_methods.insert(name.lexeme, &*f);
                     } else {
@@ -582,16 +628,7 @@ impl<'a> TreewalkInterpreter<'a> {
                     name,
                     methods: c_methods,
                 })));
-                match env.assign(name.lexeme, class) {
-                    Ok(()) => {}
-                    Err(msg) => {
-                        return Err(RuntimeError {
-                            message: msg,
-                            token: name,
-                        }
-                        .into())
-                    }
-                }
+                env.assign(name, class)?;
             }
         }
         Ok(())
@@ -626,17 +663,18 @@ impl<'a> TreewalkInterpreter<'a> {
         name: &'a Token,
         expr: &'a Expr<'a>,
     ) -> InterpretResult<'a, &'a Value<'a>> {
-        if let Some(&depth) = self.locals.get(&(expr as *const Expr<'a>)) {
-            return self.get_at(depth, name.lexeme, name);
-        }
-        match self.env.borrow().get(name.lexeme) {
-            Ok(v) => Ok(v),
-            Err(msg) => Err(RuntimeError {
+        let result = if let Some(&depth) = self.locals.get(&(expr as *const Expr<'a>)) {
+            get_at(Rc::clone(&self.env), depth, name.lexeme)
+        } else {
+            self.env.borrow().get(name.lexeme)
+        };
+
+        result.map_err(|msg| {
+            InterpretError::Runtime(RuntimeError {
                 token: name,
                 message: msg,
-            }
-            .into()),
-        }
+            })
+        })
     }
 
     #[allow(unused)]
@@ -645,16 +683,10 @@ impl<'a> TreewalkInterpreter<'a> {
             Expr::Assign(token, value) => {
                 let val = self.evaluate_expr(value)?;
                 if let Some(&depth) = self.locals.get(&(expr as *const Expr<'a>)) {
-                    self.assign_at(depth, token.lexeme, val, token)?;
+                    assign_at(self.env.clone(), depth, token.lexeme, val, token)?;
                 } else {
-                    return match self.env.borrow_mut().assign(token.lexeme, val) {
-                        Ok(()) => Ok(val),
-                        Err(msg) => Err(RuntimeError {
-                            token,
-                            message: msg,
-                        }
-                        .into()),
-                    };
+                    self.env.borrow_mut().assign(token, val)?;
+                    return Ok(val);
                 }
                 Ok(val)
             }
@@ -807,65 +839,50 @@ impl<'a> TreewalkInterpreter<'a> {
         }
         callable.call(self, args)
     }
+}
 
-    fn get_at(
-        &self,
-        distance: usize,
-        name: &str,
-        token: &'a Token<'a>,
-    ) -> InterpretResult<'a, &'a Value<'a>> {
-        let mut env = self.env.clone();
-        for _ in 0..distance {
-            let enclosing = env
-                .borrow()
-                .enclosing
-                .clone()
-                .ok_or(InterpretError::Runtime(RuntimeError {
-                    token,
-                    message: "No enclosing environment".to_string(),
-                }))?;
-            env = enclosing;
-        }
-        let x = match env.borrow().get(name) {
-            Ok(v) => Ok(v),
-            Err(msg) => Err(RuntimeError {
-                token,
-                message: msg,
-            }
-            .into()),
-        };
-        x
+fn get_at<'a>(
+    env: Rc<RefCell<Environment<'a>>>,
+    distance: usize,
+    name: &'a str,
+) -> Result<&'a Value<'a>, String> {
+    let mut env = env.clone();
+    for _ in 0..distance {
+        let enclosing = env.borrow().enclosing.clone().unwrap();
+        env = enclosing;
     }
+    let v = env.borrow().get(name)?;
+    Ok(v)
+}
 
-    fn assign_at(
-        &self,
-        distance: usize,
-        name: &'a str,
-        value: &'a Value<'a>,
-        token: &'a Token<'a>,
-    ) -> InterpretResult<'a, ()> {
-        let mut env = self.env.clone();
-        for _ in 0..distance {
-            let enclosing = env
-                .borrow()
-                .enclosing
-                .clone()
-                .ok_or(InterpretError::Runtime(RuntimeError {
-                    token,
-                    message: "No enclosing environment".to_string(),
-                }))?;
-            env = enclosing;
-        }
-        let mut borrowed = env.borrow_mut();
-        if borrowed.values.contains_key(name) {
-            borrowed.values.insert(name, value);
-            Ok(())
-        } else {
-            Err(InterpretError::Runtime(RuntimeError {
+fn assign_at<'a>(
+    env: Rc<RefCell<Environment<'a>>>,
+    distance: usize,
+    name: &'a str,
+    value: &'a Value<'a>,
+    token: &'a Token<'a>,
+) -> InterpretResult<'a, ()> {
+    let mut env = env.clone();
+    for _ in 0..distance {
+        let enclosing = env
+            .borrow()
+            .enclosing
+            .clone()
+            .ok_or(InterpretError::Runtime(RuntimeError {
                 token,
-                message: format!("Undefined variable '{}'.", name),
-            }))
-        }
+                message: "No enclosing environment".to_string(),
+            }))?;
+        env = enclosing;
+    }
+    let mut borrowed = env.borrow_mut();
+    if borrowed.values.contains_key(name) {
+        borrowed.values.insert(name, value);
+        Ok(())
+    } else {
+        Err(InterpretError::Runtime(RuntimeError {
+            token,
+            message: format!("Undefined variable '{}'.", name),
+        }))
     }
 }
 
@@ -874,6 +891,7 @@ enum FunctionType {
     None,
     Function,
     Method,
+    Initializer,
 }
 
 pub struct Resolver<'a> {
@@ -975,6 +993,9 @@ impl<'a> Resolver<'a> {
                     self.error(keyword, "Can't return from top-level code.");
                 }
                 if let Some(expr) = value {
+                    if self.current_function == FunctionType::Initializer {
+                        self.error(keyword, "Can't return a value from an initializer.");
+                    }
                     self.resolve_expr(expr);
                 }
             }
@@ -1001,8 +1022,12 @@ impl<'a> Resolver<'a> {
                 self.scopes.last_mut().unwrap().insert("this", true);
 
                 for method in methods {
-                    if let Stmt::Function(_name, params, body) = method {
-                        self.resolve_function(params, body, FunctionType::Method);
+                    if let Stmt::Function(name, params, body) = method {
+                        let mut declaration = FunctionType::Method;
+                        if name.lexeme.eq("init") {
+                            declaration = FunctionType::Initializer;
+                        }
+                        self.resolve_function(params, body, declaration);
                     } else {
                         panic!("unexpected method type");
                     }
