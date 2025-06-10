@@ -76,6 +76,13 @@ impl<'a> Parser<'a> {
 
     fn class(&self) -> ParseResult<&'a Stmt<'a>> {
         let name = self.consume(&TokenType::Identifier, "Expect class name.")?;
+        let super_class: Option<&'a Expr<'a>> = if self.match_one(&TokenType::Less) {
+            self.consume(&TokenType::Identifier, "Expect superclass name.")?;
+            Some(self.bump.alloc(Expr::Variable(self.previous())))
+        } else {
+            None
+        };
+
         self.consume(&TokenType::LeftBrace, "Expect '{' before class body.")?;
         let mut methods = BVec::new_in(self.bump);
 
@@ -84,7 +91,7 @@ impl<'a> Parser<'a> {
         }
 
         self.consume(&TokenType::RightBrace, "Expect '}' after class body.")?;
-        Ok(self.bump.alloc(Stmt::Class(name, methods)))
+        Ok(self.bump.alloc(Stmt::Class(name, super_class, methods)))
     }
 
     fn function(&self, kind: &str) -> ParseResult<&'a Stmt<'a>> {
@@ -469,6 +476,13 @@ impl<'a> Parser<'a> {
 
         if self.match_one(&TokenType::This) {
             return Ok(self.bump.alloc(Expr::This(self.previous())));
+        }
+
+        if self.match_one(&TokenType::Super) {
+            let keyword = self.previous();
+            self.consume(&TokenType::Dot, "Expect '.' after 'super'.")?;
+            let method = self.consume(&TokenType::Identifier, "Expect superclass method name.")?;
+            return Ok(self.bump.alloc(Expr::Super(keyword, method)));
         }
 
         Err(self.error(self.peek(), "Expect expression."))

@@ -46,17 +46,27 @@ impl<'a> Callable<'a> for NativeFunction<'a> {
 enum ClassType {
     None,
     Class,
+    SubClass,
 }
 
 #[derive(Clone, Debug)]
 struct LoxClass<'a> {
     name: &'a Token<'a>,
     methods: HashMap<&'a str, &'a Value<'a>>,
+    super_class: Option<&'a Value<'a>>,
 }
 
 impl<'a> LoxClass<'a> {
     fn find_method(&self, name: &str) -> Option<&&'a Value<'a>> {
-        self.methods.get(name)
+        self.methods.get(name).or_else(|| {
+            self.super_class.and_then(|super_class| {
+                if let Value::Class(c) = super_class {
+                    c.find_method(name)
+                } else {
+                    panic!("Expected Value::Class for super_class, but got another variant for method: {}", name)
+                }
+            })
+        })
     }
 }
 
@@ -601,10 +611,38 @@ impl<'a> TreewalkInterpreter<'a> {
                 };
                 return Err(InterpretError::Return(Return { value: val }));
             }
-            Stmt::Class(name, methods) => {
-                let mut env = self.env.borrow_mut();
+            Stmt::Class(name, super_class, methods) => {
+                let super_class_val = if let Some(super_class) = super_class {
+                    let super_class_variable = if let Expr::Variable(v) = super_class {
+                        v
+                    } else {
+                        panic!("Expected Expr::Variable, but got another variant")
+                    };
+                    let x = self.evaluate_expr(super_class)?;
+                    if !matches!(x, Value::Class(_)) {
+                        return Err(RuntimeError {
+                            token: super_class_variable,
+                            message: "Superclass must be a class.".to_string(),
+                        }
+                        .into());
+                    }
+                    Some(x)
+                } else {
+                    None
+                };
 
-                env.define(name.lexeme, self.bump.alloc(Value::Nil));
+                self.env
+                    .borrow_mut()
+                    .define(name.lexeme, self.bump.alloc(Value::Nil));
+
+                if super_class_val.is_some() {
+                    let new_env =
+                        Rc::new(RefCell::new(Environment::with_enclosing(self.env.clone())));
+                    new_env
+                        .borrow_mut()
+                        .define("super", super_class_val.unwrap());
+                    self.env = new_env;
+                }
 
                 let mut c_methods = HashMap::new();
                 for method in methods {
@@ -626,9 +664,19 @@ impl<'a> TreewalkInterpreter<'a> {
 
                 let class = self.bump.alloc(Value::Class(self.bump.alloc(LoxClass {
                     name,
+                    super_class: super_class_val,
                     methods: c_methods,
                 })));
-                env.assign(name, class)?;
+
+                if super_class_val.is_some() {
+                    let new_env = {
+                        let env = self.env.borrow();
+                        env.enclosing.clone().unwrap()
+                    };
+                    self.env = new_env;
+                }
+
+                self.env.borrow_mut().assign(name, class)?;
             }
         }
         Ok(())
@@ -795,7 +843,37 @@ impl<'a> TreewalkInterpreter<'a> {
                     .into()),
                 }
             }
-            Expr::Super(token, token1) => todo!(),
+            Expr::Super(keyword, method) => {
+                let distance = *self.locals.get(&(expr as *const Expr<'a>)).unwrap();
+                let super_class = get_at(self.env.clone(), distance, "super").unwrap();
+                let object = match get_at(self.env.clone(), distance - 1, "this").unwrap() {
+                    Value::Instance(lox_instance) => lox_instance,
+                    _ => panic!("unexpected error"),
+                };
+
+                let method = if let Value::Class(f) = super_class {
+                    match f.find_method(method.lexeme) {
+                        Some(v) => v,
+                        None => {
+                            return Err(RuntimeError {
+                                token: method,
+                                message: format!("Undefined property '{}'.", method.lexeme)
+                                    .to_string(),
+                            }
+                            .into())
+                        }
+                    }
+                } else {
+                    panic!("unexpected error");
+                };
+
+                match method {
+                    Value::Function(lox_function) => Ok(self
+                        .bump
+                        .alloc(Value::Function(lox_function.bind(object, self)))),
+                    _ => panic!("unexpected error"),
+                }
+            }
             Expr::Unary(operator, right) => {
                 let right_val = self.evaluate_expr(right)?;
                 match operator.typ {
@@ -1011,12 +1089,30 @@ impl<'a> Resolver<'a> {
                 self.resolve_stmt(body);
             }
             Stmt::Break(_) => {}
-            Stmt::Class(name, methods) => {
+            Stmt::Class(name, super_class, methods) => {
                 let enclosing_class = self.current_class;
                 self.current_class = ClassType::Class;
 
                 self.declare(name.lexeme, name);
                 self.define(name.lexeme);
+
+                if let Some(super_class) = super_class {
+                    if let Expr::Variable(s) = super_class {
+                        if name.lexeme.eq(s.lexeme) {
+                            self.error(s, "A class can't inherit from itself.");
+                        }
+                    } else {
+                        panic!("unexpected error");
+                    }
+
+                    self.resolve_expr(super_class);
+                }
+
+                if super_class.is_some() {
+                    self.current_class = ClassType::SubClass;
+                    self.begin_scope();
+                    self.scopes.last_mut().unwrap().insert("super", true);
+                }
 
                 self.begin_scope();
                 self.scopes.last_mut().unwrap().insert("this", true);
@@ -1034,6 +1130,10 @@ impl<'a> Resolver<'a> {
                 }
 
                 self.end_scope();
+                if super_class.is_some() {
+                    self.end_scope();
+                }
+
                 self.current_class = enclosing_class;
             }
         }
@@ -1106,7 +1206,16 @@ impl<'a> Resolver<'a> {
                 }
                 self.resolve_local(expr, keyword);
             }
-            Expr::Super(_, _) => todo!(),
+            Expr::Super(keyword, _method) => {
+                if self.current_class == ClassType::None {
+                    self.error(keyword, "Can't use 'super' outside of a class.");
+                    return;
+                } else if self.current_class != ClassType::SubClass {
+                    self.error(keyword, "Can't use 'super' in a class with no superclass.");
+                    return;
+                }
+                self.resolve_local(expr, keyword);
+            }
         }
     }
 }
