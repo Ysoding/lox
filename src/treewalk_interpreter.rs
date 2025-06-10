@@ -646,17 +646,17 @@ impl<'a> TreewalkInterpreter<'a> {
 
                 let mut c_methods = HashMap::new();
                 for method in methods {
-                    if let Stmt::Function(name, params, body) = method {
+                    if let Stmt::Function(m_name, m_params, m_body) = method {
                         let f =
                             self.bump
                                 .alloc(Value::Function(self.bump.alloc(LoxFunction::new(
-                                    name,
-                                    params,
-                                    body,
+                                    m_name,
+                                    m_params,
+                                    m_body,
                                     Rc::clone(&self.env),
-                                    name.lexeme.eq("init"),
+                                    m_name.lexeme.eq("init"),
                                 ))));
-                        c_methods.insert(name.lexeme, &*f);
+                        c_methods.insert(m_name.lexeme, &*f);
                     } else {
                         panic!("expected function statement");
                     }
@@ -1063,7 +1063,7 @@ impl<'a> Resolver<'a> {
                     self.resolve_stmt(else_stmt)?;
                 }
             }
-            Stmt::Print(expr) => self.resolve_expr(expr)?,
+            Stmt::Print(print_expr) => self.resolve_expr(print_expr)?,
             Stmt::Return(keyword, value) => {
                 if self.current_function == FunctionType::None {
                     return Err(ParseError {
@@ -1071,14 +1071,14 @@ impl<'a> Resolver<'a> {
                         message: "Can't return from top-level code.".to_string(),
                     });
                 }
-                if let Some(expr) = value {
+                if let Some(value_expr) = value {
                     if self.current_function == FunctionType::Initializer {
                         return Err(ParseError {
                             token: keyword,
                             message: "Can't return a value from an initializer.".to_string(),
                         });
                     }
-                    self.resolve_expr(expr)?;
+                    self.resolve_expr(value_expr)?;
                 }
             }
             Stmt::Var(token, initializer) => {
@@ -1112,11 +1112,11 @@ impl<'a> Resolver<'a> {
                         panic!("unexpected error");
                     }
 
+                    self.current_class = ClassType::SubClass;
                     self.resolve_expr(super_class)?;
                 }
 
                 if super_class.is_some() {
-                    self.current_class = ClassType::SubClass;
                     self.begin_scope();
                     self.scopes.last_mut().unwrap().insert("super", true);
                 }
@@ -1155,6 +1155,7 @@ impl<'a> Resolver<'a> {
     ) -> ParseResult<'a, ()> {
         let enclosing_function = self.current_function;
         self.current_function = f_type;
+
         self.begin_scope();
         for &param in params {
             self.declare(param.lexeme, param)?;
@@ -1166,27 +1167,28 @@ impl<'a> Resolver<'a> {
             panic!("Function body must be a block");
         }
         self.end_scope();
+
         self.current_function = enclosing_function;
         Ok(())
     }
 
     fn resolve_expr(&mut self, expr: &'a Expr<'a>) -> ParseResult<'a, ()> {
         match expr {
-            Expr::Variable(token) => {
+            Expr::Variable(name) => {
                 if let Some(scope) = self.scopes.last() {
-                    if let Some(&false) = scope.get(token.lexeme) {
+                    if let Some(&false) = scope.get(name.lexeme) {
                         return Err(ParseError {
-                            token,
+                            token: name,
                             message: "Can't read local variable in its own initializer."
                                 .to_string(),
                         });
                     }
                 }
-                self.resolve_local(expr, token);
+                self.resolve_local(expr, name);
             }
-            Expr::Assign(token, value) => {
+            Expr::Assign(name, value) => {
                 self.resolve_expr(value)?;
-                self.resolve_local(expr, token);
+                self.resolve_local(expr, name);
             }
             Expr::Binary(left, _op, right) => {
                 self.resolve_expr(left)?;

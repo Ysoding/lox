@@ -1,4 +1,9 @@
-{
-  class Foo < Foo {} // Error at 'Foo': A class can't inherit from itself.
+class Foo {
+  bar(arg) {
+    print arg;
+  }
 }
-// [c line 5] Error at end: Expect '}' after block.
+
+var bar = Foo().bar;
+print "got method"; // expect: got method
+bar("arg");          // expect: arg

@@ -58,7 +58,7 @@ fn run<'a>(resolver: &'a mut Resolver<'a>, source_code: &'a str) -> Result<(), L
 
     for token in &scanner.tokens {
         if token.typ == TokenType::Error {
-            eprintln!("[line {}] Error: Unexpected character.", token.line);
+            eprintln!("[line {}] Error: {}", token.line, token.lexeme);
             return Err(LoxError::CompileError);
         }
     }
