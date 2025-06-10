@@ -191,7 +191,7 @@ impl<'a> Scanner<'a> {
 
     fn scan_identifier(&mut self) {
         while let Some(ch) = self.peek() {
-            if !ch.is_alphabetic() {
+            if !ch.is_alphanumeric() {
                 break;
             }
             self.advance();
