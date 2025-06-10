@@ -1,14 +1,4 @@
-class Doughnut {
-  cook() {
-    print "Fry until golden brown.";
-  }
+{
+  class Foo < Foo {} // Error at 'Foo': A class can't inherit from itself.
 }
-
-class BostonCream < Doughnut {
-  cook() {
-    super.cook();
-    print "Pipe full of custard and coat with chocolate.";
-  }
-}
-
-BostonCream().cook();
+// [c line 5] Error at end: Expect '}' after block.

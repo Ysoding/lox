@@ -8,7 +8,7 @@ use bumpalo::{collections::Vec as BVec, Bump};
 
 use crate::expr::{Expr, Stmt};
 use crate::token::{Token, TokenType};
-use crate::Literal;
+use crate::{Literal, ParseError, ParseResult};
 
 type InterpretResult<'a, T> = Result<T, InterpretError<'a>>;
 
@@ -957,10 +957,11 @@ fn assign_at<'a>(
         borrowed.values.insert(name, value);
         Ok(())
     } else {
-        Err(InterpretError::Runtime(RuntimeError {
+        Err(RuntimeError {
             token,
             message: format!("Undefined variable '{}'.", name),
-        }))
+        }
+        .into())
     }
 }
 
@@ -977,7 +978,6 @@ pub struct Resolver<'a> {
     scopes: Vec<HashMap<&'a str, bool>>,
     current_function: FunctionType,
     current_class: ClassType,
-    pub had_error: bool,
 }
 
 impl<'a> Resolver<'a> {
@@ -986,14 +986,8 @@ impl<'a> Resolver<'a> {
             interpreter,
             scopes: Vec::new(),
             current_function: FunctionType::None,
-            had_error: false,
             current_class: ClassType::None,
         }
-    }
-
-    fn error(&mut self, token: &'a Token<'a>, message: &str) {
-        eprintln!("[line {}] Error: {}", token.line, message);
-        self.had_error = true;
     }
 
     fn begin_scope(&mut self) {
@@ -1004,20 +998,23 @@ impl<'a> Resolver<'a> {
         self.scopes.pop();
     }
 
-    fn declare(&mut self, name: &'a str, token: &'a Token<'a>) {
+    fn declare(&mut self, name: &'a str, token: &'a Token<'a>) -> ParseResult<'a, ()> {
         let alread_declare = self
             .scopes
             .last()
             .is_some_and(|scope| scope.contains_key(name));
 
         if alread_declare {
-            self.error(token, "Already a variable with this name in this scope.");
-            return;
+            return Err(ParseError {
+                token,
+                message: "Already variable with this name in this scope.".to_string(),
+            });
         }
 
         if let Some(scope) = self.scopes.last_mut() {
             scope.insert(name, false);
         }
+        Ok(())
     }
 
     fn define(&mut self, name: &'a str) {
@@ -1035,77 +1032,87 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    pub fn resolve(&mut self, stmts: &BVec<'a, &'a Stmt<'a>>) {
-        self.resolve_stmts(stmts);
+    pub fn resolve(&mut self, stmts: &BVec<'a, &'a Stmt<'a>>) -> ParseResult<'a, ()> {
+        self.resolve_stmts(stmts)
     }
 
-    fn resolve_stmts(&mut self, stmts: &BVec<'a, &'a Stmt<'a>>) {
+    fn resolve_stmts(&mut self, stmts: &BVec<'a, &'a Stmt<'a>>) -> ParseResult<'a, ()> {
         for stmt in stmts {
-            self.resolve_stmt(stmt);
+            self.resolve_stmt(stmt)?;
         }
+        Ok(())
     }
 
-    fn resolve_stmt(&mut self, stmt: &'a Stmt<'a>) {
+    fn resolve_stmt(&mut self, stmt: &'a Stmt<'a>) -> ParseResult<'a, ()> {
         match stmt {
             Stmt::Block(stmts) => {
                 self.begin_scope();
-                self.resolve_stmts(stmts);
+                self.resolve_stmts(stmts)?;
                 self.end_scope();
             }
-            Stmt::Expression(expr) => self.resolve_expr(expr),
+            Stmt::Expression(expr) => self.resolve_expr(expr)?,
             Stmt::Function(name, params, body) => {
-                self.declare(name.lexeme, name);
+                self.declare(name.lexeme, name)?;
                 self.define(name.lexeme);
-                self.resolve_function(params, body, FunctionType::Function);
+                self.resolve_function(params, body, FunctionType::Function)?;
             }
             Stmt::If(condition, then_stmt, else_stmt) => {
-                self.resolve_expr(condition);
-                self.resolve_stmt(then_stmt);
+                self.resolve_expr(condition)?;
+                self.resolve_stmt(then_stmt)?;
                 if let Some(else_stmt) = else_stmt {
-                    self.resolve_stmt(else_stmt);
+                    self.resolve_stmt(else_stmt)?;
                 }
             }
-            Stmt::Print(expr) => self.resolve_expr(expr),
+            Stmt::Print(expr) => self.resolve_expr(expr)?,
             Stmt::Return(keyword, value) => {
                 if self.current_function == FunctionType::None {
-                    self.error(keyword, "Can't return from top-level code.");
+                    return Err(ParseError {
+                        token: keyword,
+                        message: "Can't return from top-level code.".to_string(),
+                    });
                 }
                 if let Some(expr) = value {
                     if self.current_function == FunctionType::Initializer {
-                        self.error(keyword, "Can't return a value from an initializer.");
+                        return Err(ParseError {
+                            token: keyword,
+                            message: "Can't return a value from an initializer.".to_string(),
+                        });
                     }
-                    self.resolve_expr(expr);
+                    self.resolve_expr(expr)?;
                 }
             }
             Stmt::Var(token, initializer) => {
-                self.declare(token.lexeme, token);
+                self.declare(token.lexeme, token)?;
                 if let Some(init) = initializer {
-                    self.resolve_expr(init);
+                    self.resolve_expr(init)?;
                 }
                 self.define(token.lexeme);
             }
             Stmt::While(condition, body) => {
-                self.resolve_expr(condition);
-                self.resolve_stmt(body);
+                self.resolve_expr(condition)?;
+                self.resolve_stmt(body)?;
             }
             Stmt::Break(_) => {}
             Stmt::Class(name, super_class, methods) => {
                 let enclosing_class = self.current_class;
                 self.current_class = ClassType::Class;
 
-                self.declare(name.lexeme, name);
+                self.declare(name.lexeme, name)?;
                 self.define(name.lexeme);
 
                 if let Some(super_class) = super_class {
                     if let Expr::Variable(s) = super_class {
                         if name.lexeme.eq(s.lexeme) {
-                            self.error(s, "A class can't inherit from itself.");
+                            return Err(ParseError {
+                                token: s,
+                                message: "A class can't inherit from itself.".to_string(),
+                            });
                         }
                     } else {
                         panic!("unexpected error");
                     }
 
-                    self.resolve_expr(super_class);
+                    self.resolve_expr(super_class)?;
                 }
 
                 if super_class.is_some() {
@@ -1123,7 +1130,7 @@ impl<'a> Resolver<'a> {
                         if name.lexeme.eq("init") {
                             declaration = FunctionType::Initializer;
                         }
-                        self.resolve_function(params, body, declaration);
+                        self.resolve_function(params, body, declaration)?;
                     } else {
                         panic!("unexpected method type");
                     }
@@ -1137,6 +1144,7 @@ impl<'a> Resolver<'a> {
                 self.current_class = enclosing_class;
             }
         }
+        Ok(())
     }
 
     fn resolve_function(
@@ -1144,78 +1152,90 @@ impl<'a> Resolver<'a> {
         params: &'a [&'a Token<'a>],
         body: &'a Stmt<'a>,
         f_type: FunctionType,
-    ) {
+    ) -> ParseResult<'a, ()> {
         let enclosing_function = self.current_function;
         self.current_function = f_type;
         self.begin_scope();
         for &param in params {
-            self.declare(param.lexeme, param);
+            self.declare(param.lexeme, param)?;
             self.define(param.lexeme);
         }
         if let Stmt::Block(stmts) = body {
-            self.resolve_stmts(stmts);
+            self.resolve_stmts(stmts)?;
         } else {
             panic!("Function body must be a block");
         }
         self.end_scope();
         self.current_function = enclosing_function;
+        Ok(())
     }
 
-    fn resolve_expr(&mut self, expr: &'a Expr<'a>) {
+    fn resolve_expr(&mut self, expr: &'a Expr<'a>) -> ParseResult<'a, ()> {
         match expr {
             Expr::Variable(token) => {
                 if let Some(scope) = self.scopes.last() {
                     if let Some(&false) = scope.get(token.lexeme) {
-                        self.error(token, "Can't read local variable in its own initializer.");
+                        return Err(ParseError {
+                            token,
+                            message: "Can't read local variable in its own initializer."
+                                .to_string(),
+                        });
                     }
                 }
                 self.resolve_local(expr, token);
             }
             Expr::Assign(token, value) => {
-                self.resolve_expr(value);
+                self.resolve_expr(value)?;
                 self.resolve_local(expr, token);
             }
             Expr::Binary(left, _op, right) => {
-                self.resolve_expr(left);
-                self.resolve_expr(right);
+                self.resolve_expr(left)?;
+                self.resolve_expr(right)?;
             }
             Expr::Call(callee, _paren, args) => {
-                self.resolve_expr(callee);
+                self.resolve_expr(callee)?;
                 for arg in args {
-                    self.resolve_expr(arg);
+                    self.resolve_expr(arg)?;
                 }
             }
-            Expr::Grouping(expr) => self.resolve_expr(expr),
+            Expr::Grouping(expr) => self.resolve_expr(expr)?,
             Expr::Literal(_) => {}
             Expr::Logical(left, _op, right) => {
-                self.resolve_expr(left);
-                self.resolve_expr(right);
+                self.resolve_expr(left)?;
+                self.resolve_expr(right)?;
             }
-            Expr::Unary(_op, right) => self.resolve_expr(right),
+            Expr::Unary(_op, right) => self.resolve_expr(right)?,
             Expr::Get(object, _name) => {
-                self.resolve_expr(object);
+                self.resolve_expr(object)?;
             }
             Expr::Set(obj, _name, value) => {
-                self.resolve_expr(value);
-                self.resolve_expr(obj);
+                self.resolve_expr(value)?;
+                self.resolve_expr(obj)?;
             }
             Expr::This(keyword) => {
                 if self.current_class == ClassType::None {
-                    self.error(keyword, "Can't use 'this' outside of a class.");
-                    return;
+                    return Err(ParseError {
+                        token: keyword,
+                        message: "Can't use 'this' outside of a class.".to_string(),
+                    });
                 }
                 self.resolve_local(expr, keyword);
             }
             Expr::Super(keyword, _method) => {
                 if self.current_class == ClassType::None {
-                    self.error(keyword, "Can't use 'super' outside of a class.");
-                    return;
+                    return Err(ParseError {
+                        token: keyword,
+                        message: "Can't use 'super' outside of a class.".to_string(),
+                    });
                 } else if self.current_class != ClassType::SubClass {
-                    self.error(keyword, "Can't use 'super' in a class with no superclass.");
-                    return;
+                    return Err(ParseError {
+                        token: keyword,
+                        message: "Can't use 'super' in a class with no superclass.".to_string(),
+                    });
                 }
                 self.resolve_local(expr, keyword);
             }
         }
+        Ok(())
     }
 }

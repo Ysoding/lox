@@ -58,7 +58,7 @@ fn run<'a>(resolver: &'a mut Resolver<'a>, source_code: &'a str) -> Result<(), L
 
     for token in &scanner.tokens {
         if token.typ == TokenType::Error {
-            println!("[line {}] Error: Unexpected character.", token.line);
+            eprintln!("[line {}] Error: Unexpected character.", token.line);
             return Err(LoxError::CompileError);
         }
     }
@@ -66,21 +66,24 @@ fn run<'a>(resolver: &'a mut Resolver<'a>, source_code: &'a str) -> Result<(), L
     let parser = Parser::new(&scanner.tokens, resolver.interpreter.bump);
     match parser.parse() {
         Ok(stmts) => {
-            resolver.resolve(&stmts);
-            if resolver.had_error {
-                return Err(LoxError::CompileError);
-            }
+            match resolver.resolve(&stmts) {
+                Ok(_) => {}
+                Err(err) => {
+                    eprintln!("{}", err);
+                    return Err(LoxError::CompileError);
+                }
+            };
             let res = resolver.interpreter.interpret(&stmts);
             match res {
                 Ok(v) => Ok(v),
                 Err(e) => {
-                    eprintln!("[line {}] {}", e.token.line, e.message);
+                    eprintln!("{}\n[line {}]", e.message, e.token.line);
                     Err(LoxError::RuntimeError)
                 }
             }
         }
         Err(e) => {
-            println!("{}", e);
+            eprintln!("{}", e);
             Err(LoxError::CompileError)
         }
     }

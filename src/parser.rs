@@ -12,8 +12,8 @@ use bumpalo::{collections::Vec as BVec, Bump};
 
 #[derive(Debug)]
 pub struct ParseError<'a> {
-    message: String,
-    token: &'a Token<'a>,
+    pub message: String,
+    pub token: &'a Token<'a>,
 }
 
 impl Error for ParseError<'_> {}
