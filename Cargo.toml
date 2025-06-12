@@ -5,7 +5,12 @@ edition = "2021"
 
 [[bin]]
 name = "lox"
-path = "src/bin/lox_treewalk_interpreter.rs"
+path = "src/bin/lox.rs"
+
+[[bin]]
+name = "jlot"
+path = "src/bin/lox.rs"
+
 
 [dependencies]
 anyhow = "1.0.95"
