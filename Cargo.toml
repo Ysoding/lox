@@ -4,17 +4,16 @@ version = "0.1.0"
 edition = "2021"
 
 [[bin]]
-name = "lox"
-path = "src/bin/lox.rs"
+name = "clox"
+path = "src/bin/clox.rs"
 
 [[bin]]
-name = "jlot"
-path = "src/bin/lox.rs"
-
+name = "jlox"
+path = "src/bin/jlox.rs"
 
 [dependencies]
 anyhow = "1.0.95"
-bumpalo = { version = "3.17.0", features = ["collections"] }
+bumpalo = { version = "3.18.0", features = ["collections"] }
 thiserror = "2.0.11"
 
 [dev-dependencies]
