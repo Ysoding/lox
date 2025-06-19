@@ -16,3 +16,5 @@ pub use parser::*;
 // clot
 mod chunk;
 pub use chunk::*;
+mod value;
+pub use value::*;

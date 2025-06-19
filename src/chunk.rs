@@ -1,11 +1,15 @@
+use crate::Value;
+
 pub enum OpCode {
     Return,
+    Constant(u8),
     Unknown,
 }
 
 #[derive(Default)]
 pub struct Chunk {
     code: Vec<OpCode>,
+    constants: Vec<Value>,
 }
 
 impl Chunk {
@@ -13,8 +17,13 @@ impl Chunk {
         Self::default()
     }
 
-    pub fn write_opcode(&mut self, op_code: OpCode) {
+    pub fn write_chunk(&mut self, op_code: OpCode) {
         self.code.push(op_code);
+    }
+
+    pub fn add_constant(&mut self, value: Value) -> usize {
+        self.constants.push(value);
+        self.constants.len() - 1
     }
 
     pub fn disassemble(&self, name: &str) {
@@ -30,13 +39,21 @@ impl Chunk {
 
         let op_code = self.code.get(offset).unwrap();
         match op_code {
-            OpCode::Return => self.simple_instruction("OP_RETURN", offset),
-            OpCode::Unknown => offset + 1,
+            OpCode::Return => self.simple_instruction("OP_RETURN"),
+            OpCode::Constant(c) => self.constant_instruction("OP_CONSTANT", *c),
+            OpCode::Unknown => {}
         }
+        offset + 1
     }
 
-    fn simple_instruction(&self, name: &str, offset: usize) -> usize {
+    fn simple_instruction(&self, name: &str) {
         println!("{}", name);
-        return offset + 1;
+    }
+
+    fn constant_instruction(&self, name: &str, constant: u8) {
+        println!(
+            "{:-16} {:4} '{}'",
+            name, constant, self.constants[constant as usize]
+        );
     }
 }
