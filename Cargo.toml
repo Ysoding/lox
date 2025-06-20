@@ -3,21 +3,13 @@ name = "lox"
 version = "0.1.0"
 edition = "2021"
 
-[features]
-debug_trace_execution = []
-default = ["debug_trace_execution"]
+[workspace]
+members = ["jlox", "clox"]
+default-members = ["clox"]
 
-[[bin]]
-name = "clox"
-path = "src/bin/clox.rs"
 
-[[bin]]
-name = "jlox"
-path = "src/bin/jlox.rs"
-
-[dependencies]
+[workspace.dependencies]
 anyhow = "1.0.95"
-bumpalo = { version = "3.18.0", features = ["collections"] }
 criterion = "0.6.0"
 thiserror = "2.0.11"
 

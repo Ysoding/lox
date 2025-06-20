@@ -1,7 +1,7 @@
 use std::{env, fs, path::PathBuf, process};
 
 use bumpalo::Bump;
-use lox::{LoxError, Parser, Resolver, Scanner, TokenType, TreewalkInterpreter};
+use jlox::{LoxError, Parser, Resolver, Scanner, TokenType, TreewalkInterpreter};
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -20,8 +20,8 @@ fn run_file(file_path: PathBuf) {
     let mut resolver = Resolver::new(&mut interp);
     if let Err(error) = run(&mut resolver, &source) {
         match error {
-            lox::LoxError::CompileError => process::exit(65),
-            lox::LoxError::RuntimeError => process::exit(70),
+            LoxError::CompileError => process::exit(65),
+            LoxError::RuntimeError => process::exit(70),
         }
     }
 }

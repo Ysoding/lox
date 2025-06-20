@@ -1,0 +1,18 @@
+[package]
+name = "clox"
+version = "0.1.0"
+edition = "2024"
+
+[features]
+debug_trace_execution = []
+default = ["debug_trace_execution"]
+
+
+[[bin]]
+name = "clox"
+path = "src/bin/clox.rs"
+
+
+[dependencies]
+anyhow = { workspace = true }
+thiserror = { workspace = true }

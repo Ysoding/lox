@@ -22,7 +22,11 @@ impl VirtualMachine {
         Self::default()
     }
 
-    pub fn interpret(&mut self, chunk: Chunk) -> Result<(), LoxError> {
+    pub fn interpret(&mut self, source: &str) -> Result<(), LoxError> {
+        Ok(())
+    }
+
+    pub fn interpret_a(&mut self, chunk: Chunk) -> Result<(), LoxError> {
         self.chunk = chunk;
 
         #[cfg(feature = "debug_trace_execution")]
@@ -92,3 +96,5 @@ impl VirtualMachine {
         self.stack.pop().unwrap()
     }
 }
+
+fn compile(source: &str) {}

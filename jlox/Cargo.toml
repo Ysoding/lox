@@ -1,0 +1,14 @@
+[package]
+name = "jlox"
+version = "0.1.0"
+edition = "2024"
+
+
+[[bin]]
+name = "jlox"
+path = "src/bin/jlox.rs"
+
+[dependencies]
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+bumpalo = { version = "3.18.0", features = ["collections"] }

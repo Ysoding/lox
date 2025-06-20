@@ -9,16 +9,19 @@ use test_generator::test_resources;
 
 fn loxido_command() -> Command {
     // Create full path to binary
-    let mut path = env::current_exe()
-        .unwrap()
-        .parent()
-        .unwrap()
-        .parent()
-        .unwrap()
-        .to_owned();
-    path.push(env!("CARGO_PKG_NAME"));
-    path.set_extension(env::consts::EXE_EXTENSION);
-    Command::new(path.into_os_string())
+    // let mut path = env::current_exe()
+    //     .unwrap()
+    //     .parent()
+    //     .unwrap()
+    //     .parent()
+    //     .unwrap()
+    //     .to_owned();
+    // path.push(env!("CARGO_PKG_NAME"));
+    // path.set_extension(env::consts::EXE_EXTENSION);
+    // Command::new(path.into_os_string())
+    let mut cmd = Command::new("cargo");
+    cmd.args(["run", "-p", "clox", "--bin", "clox", "--"]);
+    cmd
 }
 
 struct RuntimeError {
