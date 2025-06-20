@@ -19,8 +19,8 @@ fn loxido_command() -> Command {
     // path.push(env!("CARGO_PKG_NAME"));
     // path.set_extension(env::consts::EXE_EXTENSION);
     // Command::new(path.into_os_string())
-    let mut cmd = Command::new("cargo");
-    cmd.args(["run", "-p", "clox", "--bin", "clox", "--"]);
+    let mut cmd = Command::new("target/debug/jlox");
+    // cmd.args(["run", "-p", "jlox", "--bin", "jlox", "--"]);
     cmd
 }
 
