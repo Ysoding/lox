@@ -5,7 +5,7 @@ edition = "2021"
 
 [workspace]
 members = ["jlox", "clox"]
-default-members = ["jlox"]
+default-members = ["clox"]
 
 [workspace.dependencies]
 anyhow = "1.0.95"

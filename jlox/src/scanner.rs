@@ -171,7 +171,7 @@ impl<'a> Scanner<'a> {
         self.advance_digit();
 
         // Look for a fractional part.
-        if self.source[self.current..].len() > 2 {
+        if self.source[self.current..].len() >= 2 {
             let mut iter = self.source[self.current..self.current + 2].chars();
             if let Some('.') = iter.next() {
                 if let Some(c2) = iter.next() {
@@ -294,7 +294,7 @@ impl<'a> Scanner<'a> {
         }
     }
 
-    fn is_at_end(&self) -> bool {
-        self.current >= self.source.len()
+    fn is_at_end(&mut self) -> bool {
+        self.peek().is_none()
     }
 }

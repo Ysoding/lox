@@ -6,3 +6,5 @@ mod value;
 pub use value::*;
 mod vm;
 pub use vm::*;
+mod scanner;
+pub use scanner::*;

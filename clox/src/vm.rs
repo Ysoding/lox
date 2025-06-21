@@ -1,6 +1,6 @@
 use anyhow::Result;
 
-use crate::{Chunk, LoxError, OpCode, Value};
+use crate::{Chunk, LoxError, OpCode, Scanner, Value};
 
 macro_rules! binary_op {
     ($self:ident, $op:tt) => {{
@@ -23,6 +23,7 @@ impl VirtualMachine {
     }
 
     pub fn interpret(&mut self, source: &str) -> Result<(), LoxError> {
+        compile(source);
         Ok(())
     }
 
@@ -97,4 +98,16 @@ impl VirtualMachine {
     }
 }
 
-fn compile(source: &str) {}
+fn compile(source: &str) {
+    let scanner = Scanner::new(source);
+    let mut line = u32::MAX;
+    for token in scanner {
+        if token.line != line {
+            print!("{:04} ", token.line);
+            line = token.line;
+        } else {
+            print!("   | ");
+        }
+        println!("{:?} '{}'", token.typ, token.lexeme);
+    }
+}
