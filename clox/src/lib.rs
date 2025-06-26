@@ -8,3 +8,5 @@ mod vm;
 pub use vm::*;
 mod scanner;
 pub use scanner::*;
+mod compiler;
+pub use compiler::*;

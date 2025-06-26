@@ -45,19 +45,6 @@ impl Chunk {
         }
     }
 
-    pub fn write_constant(&mut self, value: Value, line: u32) {
-        let constant_index = self.add_constant(value);
-        if constant_index < 256 {
-            // Use OP_CONSTANT for indices 0-255
-            self.write_chunk(OpCode::Constant(constant_index as u8), line);
-        } else if constant_index < (1 << 24) {
-            // Use OP_CONSTANT_LONG for indices 256-16,777,215
-            self.write_chunk(OpCode::ConstantLong(constant_index as u32), line);
-        } else {
-            panic!("Too many constants in one chunk");
-        }
-    }
-
     fn get_line(&self, instruction_index: usize) -> u32 {
         let mut current_index = 0;
         for &(line, count) in &self.line_runs {
@@ -69,12 +56,14 @@ impl Chunk {
         panic!("Instruction index {} out of bounds", instruction_index);
     }
 
-    fn add_constant(&mut self, value: Value) -> usize {
+    pub fn add_constant(&mut self, value: Value) -> usize {
         self.constants.push(value);
         self.constants.len() - 1
     }
+}
 
-    #[cfg(feature = "debug_trace_execution")]
+#[cfg(feature = "debug_trace_execution")]
+impl Chunk {
     pub fn disassemble(&self, name: &str) {
         println!("== {} ==", name);
         let mut offset = 0;
@@ -84,8 +73,6 @@ impl Chunk {
             offset += 1;
         }
     }
-
-    #[cfg(feature = "debug_trace_execution")]
     pub fn disassemble_instruction(&self, offset: usize, dummy_offset: usize) -> usize {
         print!("{:04} ", dummy_offset);
 
@@ -132,13 +119,9 @@ impl Chunk {
             }
         }
     }
-
-    #[cfg(feature = "debug_trace_execution")]
     fn simple_instruction(&self, name: &str) {
         println!("{}", name);
     }
-
-    #[cfg(feature = "debug_trace_execution")]
     fn constant_long_instruction(&self, name: &str, constant: u32) {
         println!(
             "{:-16} {:4} '{}'",
@@ -146,7 +129,6 @@ impl Chunk {
         );
     }
 
-    #[cfg(feature = "debug_trace_execution")]
     fn constant_instruction(&self, name: &str, constant: u8) {
         println!(
             "{:-16} {:4} '{}'",

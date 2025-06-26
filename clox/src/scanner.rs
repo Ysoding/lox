@@ -1,6 +1,6 @@
 use std::{iter::Peekable, str::Chars};
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum TokenType {
     // Single-character tokens.
     LeftParen,
@@ -53,6 +53,7 @@ pub enum TokenType {
     Error,
 }
 
+#[derive(Clone, Copy)]
 pub struct Token<'a> {
     pub lexeme: &'a str,
     pub line: u32,
@@ -62,6 +63,16 @@ pub struct Token<'a> {
 impl<'a> Token<'a> {
     pub fn new(typ: TokenType, lexeme: &'a str, line: u32) -> Self {
         Self { lexeme, line, typ }
+    }
+}
+
+impl Default for Token<'_> {
+    fn default() -> Self {
+        Self {
+            lexeme: "",
+            line: 1,
+            typ: TokenType::Eof,
+        }
     }
 }
 

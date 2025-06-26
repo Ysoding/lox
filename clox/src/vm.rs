@@ -1,6 +1,6 @@
 use anyhow::Result;
 
-use crate::{Chunk, LoxError, OpCode, Scanner, Value};
+use crate::{Chunk, LoxError, OpCode, Value, compile};
 
 macro_rules! binary_op {
     ($self:ident, $op:tt) => {{
@@ -22,14 +22,19 @@ impl VirtualMachine {
         Self::default()
     }
 
-    pub fn interpret(&mut self, source: &str) -> Result<(), LoxError> {
-        compile(source);
-        Ok(())
+    pub fn clear(&mut self) {
+        self.ip = 0;
+        self.stack.clear();
     }
 
-    pub fn interpret_a(&mut self, chunk: Chunk) -> Result<(), LoxError> {
+    pub fn interpret(&mut self, source: &str) -> Result<(), LoxError> {
+        let mut chunk = Chunk::new();
+        compile(source, &mut chunk)?;
         self.chunk = chunk;
+        self.run()
+    }
 
+    fn run(&mut self) -> Result<(), LoxError> {
         #[cfg(feature = "debug_trace_execution")]
         let mut dummy_offset = 0;
 
@@ -95,19 +100,5 @@ impl VirtualMachine {
 
     fn pop(&mut self) -> Value {
         self.stack.pop().unwrap()
-    }
-}
-
-fn compile(source: &str) {
-    let scanner = Scanner::new(source);
-    let mut line = u32::MAX;
-    for token in scanner {
-        if token.line != line {
-            print!("{:04} ", token.line);
-            line = token.line;
-        } else {
-            print!("   | ");
-        }
-        println!("{:?} '{}'", token.typ, token.lexeme);
     }
 }

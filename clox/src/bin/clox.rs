@@ -51,5 +51,6 @@ fn repl() {
             continue;
         }
         vm.interpret(&buffer).ok();
+        vm.clear();
     }
 }
