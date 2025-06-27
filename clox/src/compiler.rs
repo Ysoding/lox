@@ -189,6 +189,9 @@ impl<'a> Parser<'a> {
         self.parse_precedence(Precedence::Unary);
 
         match operator_type {
+            TokenType::Bang => {
+                self.emit_byte(OpCode::Not);
+            }
             TokenType::Minus => {
                 self.emit_byte(OpCode::Negate);
             }
@@ -202,6 +205,24 @@ impl<'a> Parser<'a> {
         self.parse_precedence(rule.precedence + 1);
 
         match operator_type {
+            TokenType::BangEqual => {
+                self.emit_two_bytes(OpCode::Equal, OpCode::Not);
+            }
+            TokenType::EqualEqual => {
+                self.emit_byte(OpCode::Equal);
+            }
+            TokenType::Greater => {
+                self.emit_byte(OpCode::Greater);
+            }
+            TokenType::GreaterEqual => {
+                self.emit_two_bytes(OpCode::Less, OpCode::Not);
+            }
+            TokenType::Less => {
+                self.emit_byte(OpCode::Less);
+            }
+            TokenType::LessEqual => {
+                self.emit_two_bytes(OpCode::Greater, OpCode::Not);
+            }
             TokenType::Plus => {
                 self.emit_byte(OpCode::Add);
             }
@@ -213,6 +234,21 @@ impl<'a> Parser<'a> {
             }
             TokenType::Slash => {
                 self.emit_byte(OpCode::Divide);
+            }
+            _ => return,
+        }
+    }
+
+    fn literal(&mut self) {
+        match self.previous.typ {
+            TokenType::False => {
+                self.emit_byte(OpCode::False);
+            }
+            TokenType::Nil => {
+                self.emit_byte(OpCode::Nil);
+            }
+            TokenType::True => {
+                self.emit_byte(OpCode::True);
             }
             _ => return,
         }
@@ -277,31 +313,33 @@ impl<'a> ParseRule<'a> {
             TokenType::Semicolon => Self::new(None, None, Precedence::None),
             TokenType::Slash => Self::new(None, Some(Parser::binary), Precedence::Factor),
             TokenType::Star => Self::new(None, Some(Parser::binary), Precedence::Factor),
-            TokenType::Bang => Self::new(None, None, Precedence::None),
-            TokenType::BangEqual => Self::new(None, None, Precedence::None),
+            TokenType::Bang => Self::new(Some(Parser::unary), None, Precedence::None),
+            TokenType::BangEqual => Self::new(None, Some(Parser::binary), Precedence::Equality),
             TokenType::Equal => Self::new(None, None, Precedence::None),
-            TokenType::EqualEqual => Self::new(None, None, Precedence::None),
-            TokenType::Greater => Self::new(None, None, Precedence::None),
-            TokenType::GreaterEqual => Self::new(None, None, Precedence::None),
-            TokenType::Less => Self::new(None, None, Precedence::None),
-            TokenType::LessEqual => Self::new(None, None, Precedence::None),
+            TokenType::EqualEqual => Self::new(None, Some(Parser::binary), Precedence::Equality),
+            TokenType::Greater => Self::new(None, Some(Parser::binary), Precedence::Comparison),
+            TokenType::GreaterEqual => {
+                Self::new(None, Some(Parser::binary), Precedence::Comparison)
+            }
+            TokenType::Less => Self::new(None, Some(Parser::binary), Precedence::Comparison),
+            TokenType::LessEqual => Self::new(None, Some(Parser::binary), Precedence::Comparison),
             TokenType::Identifier => Self::new(None, None, Precedence::None),
             TokenType::String => Self::new(None, None, Precedence::None),
             TokenType::Number => Self::new(Some(Parser::number), None, Precedence::None),
             TokenType::And => Self::new(None, None, Precedence::None),
             TokenType::Class => Self::new(None, None, Precedence::None),
             TokenType::Else => Self::new(None, None, Precedence::None),
-            TokenType::False => Self::new(None, None, Precedence::None),
+            TokenType::False => Self::new(Some(Parser::literal), None, Precedence::None),
             TokenType::Fun => Self::new(None, None, Precedence::None),
             TokenType::For => Self::new(None, None, Precedence::None),
             TokenType::If => Self::new(None, None, Precedence::None),
-            TokenType::Nil => Self::new(None, None, Precedence::None),
+            TokenType::Nil => Self::new(Some(Parser::literal), None, Precedence::None),
             TokenType::Or => Self::new(None, None, Precedence::None),
             TokenType::Print => Self::new(None, None, Precedence::None),
             TokenType::Return => Self::new(None, None, Precedence::None),
             TokenType::Super => Self::new(None, None, Precedence::None),
             TokenType::This => Self::new(None, None, Precedence::None),
-            TokenType::True => Self::new(None, None, Precedence::None),
+            TokenType::True => Self::new(Some(Parser::literal), None, Precedence::None),
             TokenType::Var => Self::new(None, None, Precedence::None),
             TokenType::While => Self::new(None, None, Precedence::None),
             TokenType::Break => Self::new(None, None, Precedence::None),

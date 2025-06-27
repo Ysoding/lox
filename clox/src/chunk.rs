@@ -12,6 +12,13 @@ pub enum OpCode {
     Return,            // 1byte
     Constant(u8),      // dummy 2bytes (opcode + u8 operand)  - actually 1byte
     ConstantLong(u32), // dummy 4bytes (opcode + 3-byte operand) - actually 4bytes
+    Nil,
+    True,
+    False,
+    Equal,
+    Greater,
+    Less,
+    Not,
     Negate,
     Add,
     Subtract,
@@ -45,7 +52,7 @@ impl Chunk {
         }
     }
 
-    fn get_line(&self, instruction_index: usize) -> u32 {
+    pub fn get_line(&self, instruction_index: usize) -> u32 {
         let mut current_index = 0;
         for &(line, count) in &self.line_runs {
             current_index += count as usize;
@@ -115,6 +122,34 @@ impl Chunk {
             }
             OpCode::Divide => {
                 self.simple_instruction("OP_DIVIDE");
+                dummy_offset + 1
+            }
+            OpCode::Nil => {
+                self.simple_instruction("OP_NIL");
+                dummy_offset + 1
+            }
+            OpCode::True => {
+                self.simple_instruction("OP_TRUE");
+                dummy_offset + 1
+            }
+            OpCode::False => {
+                self.simple_instruction("OP_FALSE");
+                dummy_offset + 1
+            }
+            OpCode::Not => {
+                self.simple_instruction("OP_NOT");
+                dummy_offset + 1
+            }
+            OpCode::Equal => {
+                self.simple_instruction("OP_EQUAL");
+                dummy_offset + 1
+            }
+            OpCode::Greater => {
+                self.simple_instruction("OP_GREATER");
+                dummy_offset + 1
+            }
+            OpCode::Less => {
+                self.simple_instruction("OP_LESS");
                 dummy_offset + 1
             }
         }

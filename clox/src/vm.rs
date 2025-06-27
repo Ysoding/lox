@@ -4,9 +4,9 @@ use crate::{Chunk, LoxError, OpCode, Value, compile};
 
 macro_rules! binary_op {
     ($self:ident, $op:tt) => {{
-        let b = $self.pop();
-        let a = $self.pop();
-        $self.push(a $op b);
+        let b = $self.pop().as_number().map_err(|_| $self.runtime_error("Operands must be numbers."))?;
+        let a = $self.pop().as_number().map_err(|_| $self.runtime_error("Operands must be numbers."))?;
+        $self.push((a $op b).into());
     }};
 }
 
@@ -22,9 +22,9 @@ impl VirtualMachine {
         Self::default()
     }
 
-    pub fn clear(&mut self) {
+    pub fn reset(&mut self) {
         self.ip = 0;
-        self.stack.clear();
+        self.reset_stack();
     }
 
     pub fn interpret(&mut self, source: &str) -> Result<(), LoxError> {
@@ -66,8 +66,12 @@ impl VirtualMachine {
                     panic!("Unknown instruction")
                 }
                 OpCode::Negate => {
-                    let v = -self.stack.pop().unwrap();
-                    self.push(v);
+                    let v = self
+                        .pop()
+                        .as_number()
+                        .map_err(|_| self.runtime_error("Operand must be a number."))?;
+
+                    self.push((-v).into());
                 }
                 OpCode::Add => {
                     binary_op!(self, +);
@@ -80,6 +84,30 @@ impl VirtualMachine {
                 }
                 OpCode::Divide => {
                     binary_op!(self, /);
+                }
+                OpCode::Nil => {
+                    self.push(Value::Nil);
+                }
+                OpCode::True => {
+                    self.push(Value::Bool(true));
+                }
+                OpCode::False => {
+                    self.push(Value::Bool(false));
+                }
+                OpCode::Not => {
+                    let v = self.pop().is_falsy();
+                    self.push(v.into());
+                }
+                OpCode::Equal => {
+                    let a = self.pop();
+                    let b = self.pop();
+                    self.push((a.equal(&b)).into());
+                }
+                OpCode::Greater => {
+                    binary_op!(self, >);
+                }
+                OpCode::Less => {
+                    binary_op!(self, <);
                 }
             }
             self.ip += 1;
@@ -100,5 +128,23 @@ impl VirtualMachine {
 
     fn pop(&mut self) -> Value {
         self.stack.pop().unwrap()
+    }
+
+    fn peek(&self, distance: usize) -> &Value {
+        &self.stack[self.stack.len() - 1 - distance]
+    }
+
+    fn reset_stack(&mut self) {
+        self.stack.clear();
+    }
+
+    fn runtime_error(&mut self, msg: &str) -> LoxError {
+        println!("{}", msg);
+
+        let line = self.chunk.get_line(self.ip);
+        println!("[line {}] in script", line);
+        self.reset_stack();
+
+        LoxError::RuntimeError
     }
 }
