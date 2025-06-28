@@ -6,6 +6,7 @@ use anyhow::Result;
 pub enum Value {
     Number(f64),
     Nil,
+    String(String),
     Bool(bool),
 }
 
@@ -14,6 +15,13 @@ impl Value {
         match self {
             Value::Number(v) => Ok(v),
             v => Err(format!("cannot convert to Number: {:?}", v)),
+        }
+    }
+
+    pub fn as_string(self) -> String {
+        match self {
+            Value::String(s) => s,
+            _ => "".to_string(),
         }
     }
 
@@ -33,6 +41,14 @@ impl Value {
         matches!(self, Value::Nil)
     }
 
+    pub fn is_string(&self) -> bool {
+        matches!(self, Value::String(_))
+    }
+
+    pub fn is_number(&self) -> bool {
+        matches!(self, Value::Number(_))
+    }
+
     pub fn is_falsy(&self) -> bool {
         self.is_nil() || (self.is_boolean() && !self.as_boolean())
     }
@@ -42,6 +58,7 @@ impl Value {
             (Value::Bool(v1), Value::Bool(v2)) => *v1 == *v2,
             (Value::Number(v1), Value::Number(v2)) => *v1 == *v2,
             (Value::Nil, Value::Nil) => true,
+            (Value::String(v1), Value::String(v2)) => *v1 == *v2,
             _ => false,
         }
     }
@@ -65,6 +82,7 @@ impl Display for Value {
             Value::Number(v) => write!(f, "{}", v),
             Value::Nil => write!(f, "nil"),
             Value::Bool(v) => write!(f, "{}", v),
+            Value::String(v) => write!(f, "{}", v),
         }
     }
 }

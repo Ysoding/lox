@@ -32,13 +32,6 @@ impl Add<u8> for Precedence {
     }
 }
 
-struct Compiler {}
-
-impl Compiler {
-    fn new() -> Self {
-        Self {}
-    }
-}
 struct Parser<'a> {
     previous: Token<'a>,
     current: Token<'a>,
@@ -174,8 +167,7 @@ impl<'a> Parser<'a> {
     }
 
     fn make_constant(&mut self, val: Value) -> usize {
-        let constant_index = self.current_chunk.as_mut().unwrap().add_constant(val);
-        constant_index
+        self.current_chunk.as_mut().unwrap().add_constant(val)
     }
 
     fn grouping(&mut self) {
@@ -195,7 +187,7 @@ impl<'a> Parser<'a> {
             TokenType::Minus => {
                 self.emit_byte(OpCode::Negate);
             }
-            _ => return,
+            _ => {}
         }
     }
 
@@ -235,8 +227,14 @@ impl<'a> Parser<'a> {
             TokenType::Slash => {
                 self.emit_byte(OpCode::Divide);
             }
-            _ => return,
+            _ => {}
         }
+    }
+
+    fn string(&mut self) {
+        self.emit_constant(Value::String(
+            self.previous.lexeme[1..self.previous.lexeme.len() - 1].to_string(),
+        ));
     }
 
     fn literal(&mut self) {
@@ -250,7 +248,7 @@ impl<'a> Parser<'a> {
             TokenType::True => {
                 self.emit_byte(OpCode::True);
             }
-            _ => return,
+            _ => {}
         }
     }
 
@@ -324,7 +322,7 @@ impl<'a> ParseRule<'a> {
             TokenType::Less => Self::new(None, Some(Parser::binary), Precedence::Comparison),
             TokenType::LessEqual => Self::new(None, Some(Parser::binary), Precedence::Comparison),
             TokenType::Identifier => Self::new(None, None, Precedence::None),
-            TokenType::String => Self::new(None, None, Precedence::None),
+            TokenType::String => Self::new(Some(Parser::string), None, Precedence::None),
             TokenType::Number => Self::new(Some(Parser::number), None, Precedence::None),
             TokenType::And => Self::new(None, None, Precedence::None),
             TokenType::Class => Self::new(None, None, Precedence::None),

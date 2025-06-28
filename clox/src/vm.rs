@@ -74,7 +74,16 @@ impl VirtualMachine {
                     self.push((-v).into());
                 }
                 OpCode::Add => {
-                    binary_op!(self, +);
+                    let v1 = self.peek(0);
+                    let v2 = self.peek(1);
+                    if v1.is_string() && v2.is_string() {
+                        self.concatenate();
+                    } else if v1.is_number() && v2.is_number() {
+                        binary_op!(self, +);
+                    } else {
+                        self.runtime_error("Operands must be two numbers or two strings.");
+                        return Err(LoxError::RuntimeError);
+                    }
                 }
                 OpCode::Subtract => {
                     binary_op!(self, -);
@@ -146,5 +155,12 @@ impl VirtualMachine {
         self.reset_stack();
 
         LoxError::RuntimeError
+    }
+
+    fn concatenate(&mut self) {
+        let b = self.pop().as_string();
+        let a = self.pop().as_string();
+
+        self.push(Value::String(format!("{}{}", a, b)));
     }
 }
