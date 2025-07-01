@@ -8,6 +8,7 @@ use crate::Value;
 
 // The following is just to keep the debug info consistent with the book.
 // A more standard approach would be to store the `code` directly as `u8,``
+#[derive(Clone, Copy)]
 pub enum OpCode {
     Return,            // 1byte
     Constant(u8),      // dummy 2bytes (opcode + u8 operand)  - actually 1byte
@@ -25,6 +26,8 @@ pub enum OpCode {
     DefineGlobal(u8),
     GetGlobal(u8),
     SetGlobal(u8),
+    GetLocal(u8),
+    SetLocal(u8),
     Add,
     Subtract,
     Multiply,
@@ -170,11 +173,20 @@ impl Chunk {
                 dummy_offset + 2
             }
             OpCode::GetGlobal(constant) => {
-                self.constant_instruction("OP_DEFINE_GLOBAL", *constant);
+                self.constant_instruction("OP_GET_GLOBAL", *constant);
                 dummy_offset + 2
             }
             OpCode::SetGlobal(constant) => {
-                self.constant_instruction("OP_DEFINE_GLOBAL", *constant);
+                self.constant_instruction("OP_SET_GLOBAL", *constant);
+                dummy_offset + 2
+            }
+            OpCode::GetLocal(slot) => {
+                self.byte_instruction("OP_GET_LOCAL", *slot);
+
+                dummy_offset + 2
+            }
+            OpCode::SetLocal(slot) => {
+                self.byte_instruction("OP_SET_LOCAL", *slot);
                 dummy_offset + 2
             }
         }
@@ -195,5 +207,9 @@ impl Chunk {
             "{:-16} {:4} '{}'",
             name, constant, self.constants[constant as usize]
         );
+    }
+
+    fn byte_instruction(&self, name: &str, slot: u8) {
+        println!("{:-16} {:4}", name, slot);
     }
 }

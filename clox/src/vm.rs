@@ -59,11 +59,11 @@ impl VirtualMachine {
                     return Ok(());
                 }
                 OpCode::Constant(c_idx) => {
-                    let constant = self.read_constant(*c_idx as usize);
+                    let constant = self.read_constant(c_idx as usize);
                     self.stack.push(constant.clone());
                 }
                 OpCode::ConstantLong(c_idx) => {
-                    let constant = self.read_constant(*c_idx as usize);
+                    let constant = self.read_constant(c_idx as usize);
                     println!("{}", constant);
                 }
                 OpCode::Unknown => {
@@ -128,13 +128,13 @@ impl VirtualMachine {
                 OpCode::Pop => {
                     self.pop();
                 }
-                OpCode::DefineGlobal(constant) => {
-                    let name = self.read_constant(*constant as usize).clone().as_string();
+                OpCode::DefineGlobal(pos) => {
+                    let name = self.read_constant(pos as usize).clone().as_string();
                     self.globals.insert(name, self.peek(0).clone());
                     self.pop();
                 }
-                OpCode::GetGlobal(constant) => {
-                    let name = self.read_constant(*constant as usize).clone().as_string();
+                OpCode::GetGlobal(pos) => {
+                    let name = self.read_constant(pos as usize).clone().as_string();
                     if let Some(v) = self.globals.get(&name) {
                         self.push(v.clone());
                     } else {
@@ -142,8 +142,8 @@ impl VirtualMachine {
                         return Err(LoxError::RuntimeError);
                     }
                 }
-                OpCode::SetGlobal(constant) => {
-                    let name = self.read_constant(*constant as usize).clone().as_string();
+                OpCode::SetGlobal(pos) => {
+                    let name = self.read_constant(pos as usize).clone().as_string();
                     if !self.globals.contains_key(&name) {
                         self.runtime_error(&format!("Undefined variable '{}'.", name));
                         return Err(LoxError::RuntimeError);
@@ -151,13 +151,19 @@ impl VirtualMachine {
 
                     self.globals.insert(name, self.peek(0).clone());
                 }
+                OpCode::GetLocal(slot) => {
+                    self.push(self.stack.get(slot as usize).unwrap().clone());
+                }
+                OpCode::SetLocal(slot) => {
+                    self.stack[slot as usize] = self.peek(0).clone();
+                }
             }
             self.ip += 1;
         }
     }
 
-    fn read_instruction(&self, instruction: usize) -> &OpCode {
-        self.chunk.code.get(instruction).unwrap()
+    fn read_instruction(&self, instruction: usize) -> OpCode {
+        *self.chunk.code.get(instruction).unwrap()
     }
 
     fn read_constant(&self, constant_idx: usize) -> &Value {
