@@ -295,6 +295,6 @@ impl<'a> Scanner<'a> {
     }
 
     fn is_at_end(&mut self) -> bool {
-        self.peek().is_none()
+        self.current >= self.source.len()
     }
 }
