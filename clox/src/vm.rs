@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use anyhow::Result;
 
 use crate::{Chunk, LoxError, OpCode, Value, compile};
@@ -10,11 +12,14 @@ macro_rules! binary_op {
     }};
 }
 
+type Table = HashMap<String, Value>;
+
 #[derive(Default)]
 pub struct VirtualMachine {
     pub chunk: Chunk,
     ip: usize,
     stack: Vec<Value>,
+    globals: Table,
 }
 
 impl VirtualMachine {
@@ -51,7 +56,6 @@ impl VirtualMachine {
 
             match self.read_instruction(self.ip) {
                 OpCode::Return => {
-                    println!("{}", self.pop());
                     return Ok(());
                 }
                 OpCode::Constant(c_idx) => {
@@ -117,6 +121,35 @@ impl VirtualMachine {
                 }
                 OpCode::Less => {
                     binary_op!(self, <);
+                }
+                OpCode::Print => {
+                    println!("{}", self.pop());
+                }
+                OpCode::Pop => {
+                    self.pop();
+                }
+                OpCode::DefineGlobal(constant) => {
+                    let name = self.read_constant(*constant as usize).clone().as_string();
+                    self.globals.insert(name, self.peek(0).clone());
+                    self.pop();
+                }
+                OpCode::GetGlobal(constant) => {
+                    let name = self.read_constant(*constant as usize).clone().as_string();
+                    if let Some(v) = self.globals.get(&name) {
+                        self.push(v.clone());
+                    } else {
+                        self.runtime_error(&format!("Undefined variable '{}'.", name));
+                        return Err(LoxError::RuntimeError);
+                    }
+                }
+                OpCode::SetGlobal(constant) => {
+                    let name = self.read_constant(*constant as usize).clone().as_string();
+                    if !self.globals.contains_key(&name) {
+                        self.runtime_error(&format!("Undefined variable '{}'.", name));
+                        return Err(LoxError::RuntimeError);
+                    }
+
+                    self.globals.insert(name, self.peek(0).clone());
                 }
             }
             self.ip += 1;

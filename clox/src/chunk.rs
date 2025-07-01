@@ -20,6 +20,11 @@ pub enum OpCode {
     Less,
     Not,
     Negate,
+    Print,
+    Pop,
+    DefineGlobal(u8),
+    GetGlobal(u8),
+    SetGlobal(u8),
     Add,
     Subtract,
     Multiply,
@@ -152,11 +157,32 @@ impl Chunk {
                 self.simple_instruction("OP_LESS");
                 dummy_offset + 1
             }
+            OpCode::Print => {
+                self.simple_instruction("OP_PRINT");
+                dummy_offset + 1
+            }
+            OpCode::Pop => {
+                self.simple_instruction("OP_POP");
+                dummy_offset + 1
+            }
+            OpCode::DefineGlobal(constant) => {
+                self.constant_instruction("OP_DEFINE_GLOBAL", *constant);
+                dummy_offset + 2
+            }
+            OpCode::GetGlobal(constant) => {
+                self.constant_instruction("OP_DEFINE_GLOBAL", *constant);
+                dummy_offset + 2
+            }
+            OpCode::SetGlobal(constant) => {
+                self.constant_instruction("OP_DEFINE_GLOBAL", *constant);
+                dummy_offset + 2
+            }
         }
     }
     fn simple_instruction(&self, name: &str) {
         println!("{}", name);
     }
+
     fn constant_long_instruction(&self, name: &str, constant: u32) {
         println!(
             "{:-16} {:4} '{}'",
