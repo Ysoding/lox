@@ -5,8 +5,8 @@ edition = "2024"
 
 [features]
 debug_trace_execution = []
-default = ["debug_trace_execution"]
-# default = []
+# default = ["debug_trace_execution"]
+default = []
 
 
 [[bin]]

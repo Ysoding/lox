@@ -262,8 +262,9 @@ impl<'a> Scanner<'a> {
                         while matches!(self.peek(), Some(c) if *c != '\n') {
                             self.advance();
                         }
+                    } else {
+                        return;
                     }
-                    return;
                 }
                 _ => return,
             }

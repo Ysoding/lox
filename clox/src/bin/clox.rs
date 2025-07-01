@@ -9,6 +9,7 @@ use clox::{LoxError, VirtualMachine};
 
 fn main() {
     let args: Vec<String> = env::args().collect();
+
     if args.len() == 1 {
         repl();
     } else if args.len() == 2 {

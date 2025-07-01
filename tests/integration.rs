@@ -21,7 +21,7 @@ fn loxido_command() -> Command {
     // Command::new(path.into_os_string())
 
     // cmd.args(["run", "-p", "jlox", "--bin", "jlox", "--"]);
-    Command::new("target/debug/jlox")
+    Command::new("target/debug/clox")
 }
 
 struct RuntimeError {
