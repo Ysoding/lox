@@ -28,11 +28,31 @@ pub enum OpCode {
     SetGlobal(u8),
     GetLocal(u8),
     SetLocal(u8),
+    JumpIfFalse(u16),
+    Jump(u16),
+    Loop(u16),
     Add,
     Subtract,
     Multiply,
     Divide,
     Unknown,
+}
+
+impl OpCode {
+    pub fn patch_jump(&mut self, val: u16) {
+        match self {
+            OpCode::JumpIfFalse(j) => {
+                *j = val;
+            }
+            OpCode::Jump(j) => {
+                *j = val;
+            }
+            OpCode::Loop(j) => {
+                *j = val;
+            }
+            _ => {}
+        }
+    }
 }
 
 #[derive(Default)]
@@ -80,16 +100,16 @@ impl Chunk {
 #[cfg(feature = "debug_trace_execution")]
 impl Chunk {
     pub fn disassemble(&self, name: &str) {
-        println!("== {} ==", name);
+        println!("\n== {} ==>", name);
         let mut offset = 0;
-        let mut dummy_offset = 0;
         while offset < self.code.len() {
-            dummy_offset = self.disassemble_instruction(offset, dummy_offset);
-            offset += 1;
+            offset = self.disassemble_instruction(offset);
         }
+        println!("<== {} ==\n", name);
     }
-    pub fn disassemble_instruction(&self, offset: usize, dummy_offset: usize) -> usize {
-        print!("{:04} ", dummy_offset);
+
+    pub fn disassemble_instruction(&self, offset: usize) -> usize {
+        print!("{:04} ", offset);
 
         if offset > 0 && self.get_line(offset) == self.get_line(offset - 1) {
             print!("   | ");
@@ -101,95 +121,82 @@ impl Chunk {
         match op_code {
             OpCode::Return => {
                 self.simple_instruction("OP_RETURN");
-                dummy_offset + 1
             }
             OpCode::Negate => {
                 self.simple_instruction("OP_NEGATE");
-                dummy_offset + 1
             }
             OpCode::Constant(c) => {
                 self.constant_instruction("OP_CONSTANT", *c);
-                dummy_offset + 2
             }
             OpCode::ConstantLong(c) => {
                 self.constant_long_instruction("OP_CONSTANT_LONG", *c);
-                dummy_offset + 4
             }
-            OpCode::Unknown => dummy_offset + 1,
+            OpCode::Unknown => {}
             OpCode::Add => {
                 self.simple_instruction("OP_ADD");
-                dummy_offset + 1
             }
             OpCode::Subtract => {
                 self.simple_instruction("OP_SUBTRACT");
-                dummy_offset + 1
             }
             OpCode::Multiply => {
                 self.simple_instruction("OP_MULTIPLY");
-                dummy_offset + 1
             }
             OpCode::Divide => {
                 self.simple_instruction("OP_DIVIDE");
-                dummy_offset + 1
             }
             OpCode::Nil => {
                 self.simple_instruction("OP_NIL");
-                dummy_offset + 1
             }
             OpCode::True => {
                 self.simple_instruction("OP_TRUE");
-                dummy_offset + 1
             }
             OpCode::False => {
                 self.simple_instruction("OP_FALSE");
-                dummy_offset + 1
             }
             OpCode::Not => {
                 self.simple_instruction("OP_NOT");
-                dummy_offset + 1
             }
             OpCode::Equal => {
                 self.simple_instruction("OP_EQUAL");
-                dummy_offset + 1
             }
             OpCode::Greater => {
                 self.simple_instruction("OP_GREATER");
-                dummy_offset + 1
             }
             OpCode::Less => {
                 self.simple_instruction("OP_LESS");
-                dummy_offset + 1
             }
             OpCode::Print => {
                 self.simple_instruction("OP_PRINT");
-                dummy_offset + 1
             }
             OpCode::Pop => {
                 self.simple_instruction("OP_POP");
-                dummy_offset + 1
             }
             OpCode::DefineGlobal(constant) => {
                 self.constant_instruction("OP_DEFINE_GLOBAL", *constant);
-                dummy_offset + 2
             }
             OpCode::GetGlobal(constant) => {
                 self.constant_instruction("OP_GET_GLOBAL", *constant);
-                dummy_offset + 2
             }
             OpCode::SetGlobal(constant) => {
                 self.constant_instruction("OP_SET_GLOBAL", *constant);
-                dummy_offset + 2
             }
             OpCode::GetLocal(slot) => {
                 self.byte_instruction("OP_GET_LOCAL", *slot);
-
-                dummy_offset + 2
             }
             OpCode::SetLocal(slot) => {
                 self.byte_instruction("OP_SET_LOCAL", *slot);
-                dummy_offset + 2
+            }
+            OpCode::JumpIfFalse(jump) => {
+                self.jump_instruction("OP_JUMP_IF_FALSE", 1, offset, *jump);
+            }
+            OpCode::Jump(jump) => {
+                self.jump_instruction("OP_JUMP", 1, offset, *jump);
+            }
+            OpCode::Loop(jump) => {
+                self.jump_instruction("OP_LOOP", -1, offset, *jump);
             }
         }
+        offset + 1
     }
     fn simple_instruction(&self, name: &str) {
         println!("{}", name);
@@ -211,5 +218,14 @@ impl Chunk {
 
     fn byte_instruction(&self, name: &str, slot: u8) {
         println!("{:-16} {:4}", name, slot);
+    }
+
+    fn jump_instruction(&self, name: &str, sign: i32, offset: usize, jump: u16) {
+        let jump = if sign < 0 {
+            offset.saturating_sub(jump as usize)
+        } else {
+            offset.saturating_add(jump as usize)
+        };
+        println!("{:-16} {:4} -> {}", name, offset, jump);
     }
 }

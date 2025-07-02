@@ -1,2 +1,5 @@
-var a = "before";
-print a; // expect: before
+var a = 1;
+for (; a < 2 ;) {
+  print "a";
+  a = a + 1;
+}

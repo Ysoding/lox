@@ -40,9 +40,6 @@ impl VirtualMachine {
     }
 
     fn run(&mut self) -> Result<(), LoxError> {
-        #[cfg(feature = "debug_trace_execution")]
-        let mut dummy_offset = 0;
-
         loop {
             #[cfg(feature = "debug_trace_execution")]
             {
@@ -51,7 +48,7 @@ impl VirtualMachine {
                     print!("[ {} ]", *ele);
                 }
                 println!();
-                dummy_offset = self.chunk.disassemble_instruction(self.ip, dummy_offset);
+                self.chunk.disassemble_instruction(self.ip);
             }
 
             match self.read_instruction(self.ip) {
@@ -156,6 +153,17 @@ impl VirtualMachine {
                 }
                 OpCode::SetLocal(slot) => {
                     self.stack[slot as usize] = self.peek(0).clone();
+                }
+                OpCode::JumpIfFalse(offset) => {
+                    if self.peek(0).is_falsy() {
+                        self.ip += offset as usize;
+                    }
+                }
+                OpCode::Jump(offset) => {
+                    self.ip += offset as usize;
+                }
+                OpCode::Loop(offset) => {
+                    self.ip -= offset as usize;
                 }
             }
             self.ip += 1;
