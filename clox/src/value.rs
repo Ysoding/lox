@@ -2,12 +2,16 @@ use std::fmt::Display;
 
 use anyhow::Result;
 
+use crate::{Function, NativeFunction};
+
 #[derive(Clone, Debug)]
 pub enum Value {
     Number(f64),
-    Nil,
     String(String),
     Bool(bool),
+    Function(Function),
+    NativeFunction(NativeFunction),
+    Nil,
 }
 
 impl Value {
@@ -18,10 +22,24 @@ impl Value {
         }
     }
 
-    pub fn as_string(self) -> String {
+    pub fn as_string(self) -> Result<String, String> {
         match self {
-            Value::String(s) => s,
-            _ => "".to_string(),
+            Value::String(s) => Ok(s),
+            _ => Err("cannot convert to String".into()),
+        }
+    }
+
+    pub fn as_native_function(self) -> Result<NativeFunction, String> {
+        match self {
+            Value::NativeFunction(f) => Ok(f),
+            _ => Err("cannot convert to NativeFunction".into()),
+        }
+    }
+
+    pub fn as_function(self) -> Result<Function, String> {
+        match self {
+            Value::Function(f) => Ok(f),
+            _ => Err("cannot convert to Function".into()),
         }
     }
 
@@ -41,12 +59,20 @@ impl Value {
         matches!(self, Value::Nil)
     }
 
+    pub fn is_native_function(&self) -> bool {
+        matches!(self, Value::NativeFunction(_))
+    }
+
     pub fn is_string(&self) -> bool {
         matches!(self, Value::String(_))
     }
 
     pub fn is_number(&self) -> bool {
         matches!(self, Value::Number(_))
+    }
+
+    pub fn is_function(&self) -> bool {
+        matches!(self, Value::Function(_))
     }
 
     pub fn is_falsy(&self) -> bool {
@@ -89,6 +115,14 @@ impl Display for Value {
             Value::Nil => write!(f, "nil"),
             Value::Bool(v) => write!(f, "{}", v),
             Value::String(v) => write!(f, "{}", v),
+            Value::Function(function) => {
+                if function.name.is_empty() {
+                    write!(f, "<script>")
+                } else {
+                    write!(f, "<fn {}>", function.name)
+                }
+            }
+            Value::NativeFunction(_) => write!(f, "<native fn>"),
         }
     }
 }

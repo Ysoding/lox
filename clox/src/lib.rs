@@ -10,3 +10,7 @@ mod scanner;
 pub use scanner::*;
 mod compiler;
 pub use compiler::*;
+mod object;
+pub use object::*;
+mod builtins;
+pub use builtins::*;

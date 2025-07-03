@@ -10,6 +10,8 @@ use clox::{LoxError, VirtualMachine};
 fn main() {
     let args: Vec<String> = env::args().collect();
 
+    // run_file("./test.lox".into());
+
     if args.len() == 1 {
         repl();
     } else if args.len() == 2 {

@@ -1,18 +1,10 @@
 use crate::Value;
 
-// macro_rules! binary_op {
-//     ($self:expr, &op:tt) => {
-//         let a = $self.pop_stack
-//     };
-// }
-
-// The following is just to keep the debug info consistent with the book.
-// A more standard approach would be to store the `code` directly as `u8,``
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum OpCode {
-    Return,            // 1byte
-    Constant(u8),      // dummy 2bytes (opcode + u8 operand)  - actually 1byte
-    ConstantLong(u32), // dummy 4bytes (opcode + 3-byte operand) - actually 4bytes
+    Return,
+    Constant(u8),
+    ConstantLong(u32),
     Nil,
     True,
     False,
@@ -31,6 +23,7 @@ pub enum OpCode {
     JumpIfFalse(u16),
     Jump(u16),
     Loop(u16),
+    Call(u8),
     Add,
     Subtract,
     Multiply,
@@ -55,7 +48,7 @@ impl OpCode {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone, Debug)]
 pub struct Chunk {
     pub code: Vec<OpCode>,
     pub constants: Vec<Value>,
@@ -80,7 +73,7 @@ impl Chunk {
         }
     }
 
-    pub fn get_line(&self, instruction_index: usize) -> u32 {
+    pub fn line(&self, instruction_index: usize) -> u32 {
         let mut current_index = 0;
         for &(line, count) in &self.line_runs {
             current_index += count as usize;
@@ -111,10 +104,10 @@ impl Chunk {
     pub fn disassemble_instruction(&self, offset: usize) -> usize {
         print!("{:04} ", offset);
 
-        if offset > 0 && self.get_line(offset) == self.get_line(offset - 1) {
+        if offset > 0 && self.line(offset) == self.line(offset - 1) {
             print!("   | ");
         } else {
-            print!("{:04} ", self.get_line(offset))
+            print!("{:04} ", self.line(offset))
         }
 
         let op_code = self.code.get(offset).unwrap();
@@ -194,6 +187,9 @@ impl Chunk {
             }
             OpCode::Loop(jump) => {
                 self.jump_instruction("OP_LOOP", -1, offset, *jump);
+            }
+            OpCode::Call(arg_count) => {
+                self.byte_instruction("OP_CALL", *arg_count);
             }
         }
         offset + 1
