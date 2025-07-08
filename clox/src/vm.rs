@@ -1,8 +1,8 @@
-use std::collections::HashMap;
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use anyhow::Result;
 
-use crate::{Chunk, Function, LoxError, NativeFunction, OpCode, Value, clock, compile};
+use crate::{Chunk, Closure, LoxError, NativeFunction, OpCode, Upvalue, Value, clock, compile};
 
 macro_rules! binary_op {
     ($self:ident, $op:tt) => {{
@@ -21,6 +21,7 @@ pub struct VirtualMachine {
     stack: Vec<Value>,
     globals: Table,
     frames: Vec<CallFrame>,
+    open_upvalues: Option<Rc<RefCell<Upvalue>>>,
 }
 
 impl VirtualMachine {
@@ -29,6 +30,7 @@ impl VirtualMachine {
             stack: Vec::with_capacity(STACK_MAX_SIZE),
             globals: Table::new(),
             frames: Vec::with_capacity(FRAME_MAX_SIZE),
+            open_upvalues: None,
         };
         vm.define_native("clock", clock);
         vm
@@ -37,6 +39,10 @@ impl VirtualMachine {
     pub fn reset(&mut self) {
         self.frames.clear();
         self.reset_stack();
+    }
+
+    fn current_closure(&self) -> &Closure {
+        &self.current_frame().closure
     }
 
     fn current_frame(&self) -> &CallFrame {
@@ -50,9 +56,8 @@ impl VirtualMachine {
     pub fn interpret(&mut self, source: &str) -> Result<(), LoxError> {
         let function = compile(source)?;
         self.push(Value::Function(function.clone()));
-        // self.frames.push(CallFrame::new(function, 0));
-        self.call(function, 0)?;
-
+        let closure = Closure::new(function);
+        self.frames.push(CallFrame::new(closure, 0));
         self.run()
     }
 
@@ -213,6 +218,38 @@ impl VirtualMachine {
                 OpCode::Call(arg_count) => {
                     self.call_value(arg_count)?;
                 }
+                OpCode::Closure(constant) => {
+                    let function = self
+                        .read_constant(constant as usize)
+                        .clone()
+                        .as_function()
+                        .unwrap();
+                    let upvalue_count = function.upvalues.len();
+                    let mut closure = Closure::new(function.clone());
+
+                    for i in 0..upvalue_count {
+                        let upvalue = function.upvalues[i].clone();
+                        let obj_upvalue = if upvalue.is_local {
+                            let location = self.current_frame().slot_start + upvalue.index as usize;
+                            self.capture_upvalue(location)
+                        } else {
+                            self.current_closure().upvalues[upvalue.index as usize].clone()
+                        };
+                        closure.upvalues.push(obj_upvalue)
+                    }
+
+                    self.push(Value::Closure(closure));
+                }
+                OpCode::GetUpvalue(slot) => {
+                    self.push(
+                        self.stack[self.current_closure().upvalues[slot as usize].location].clone(),
+                    );
+                }
+                OpCode::SetUpvalue(slot) => {
+                    let idx = self.current_closure().upvalues[slot as usize].location;
+                    self.stack[idx] = self.peek(0).clone();
+                }
+                OpCode::CloseUpvalue => {}
             }
         }
     }
@@ -226,7 +263,7 @@ impl VirtualMachine {
     }
 
     fn current_chunk(&self) -> &Chunk {
-        &self.current_frame().function.chunk
+        &self.current_frame().closure.function.chunk
     }
 
     fn push(&mut self, val: Value) {
@@ -250,7 +287,7 @@ impl VirtualMachine {
 
         (0..self.frames.len()).rev().for_each(|i| {
             let frame = &self.frames[i];
-            let function = &frame.function;
+            let function = &frame.closure.function;
             err_msg.push_str(&format!(
                 "\n[line {}] in ",
                 function.chunk.line(frame.ip - 1)
@@ -287,15 +324,16 @@ impl VirtualMachine {
     fn call_value(&mut self, arg_count: u8) -> Result<(), LoxError> {
         let callee = self.peek(arg_count as usize).clone();
         match callee {
-            Value::Function(f) => {
-                self.call(f, arg_count)?;
-            }
+            Value::Function(f) => {}
             Value::NativeFunction(f) => {
                 let left = self.stack.len() - arg_count as usize;
                 let result = f(self.stack[left..].to_vec());
                 // Stack should be restored after native function called
                 self.stack.truncate(left - 1);
                 self.push(result);
+            }
+            Value::Closure(c) => {
+                self.call(c, arg_count)?;
             }
             _ => {
                 return Err(self.runtime_error("Can only call functions and classes.".into()));
@@ -309,34 +347,40 @@ impl VirtualMachine {
             .insert(name.to_string(), Value::NativeFunction(native));
     }
 
-    fn call(&mut self, function: Function, arg_count: u8) -> Result<(), LoxError> {
-        if arg_count != function.arity {
+    fn call(&mut self, closure: Closure, arg_count: u8) -> Result<(), LoxError> {
+        if arg_count != closure.function.arity {
             return Err(self.runtime_error(&format!(
                 "Expected {} arguments but got {}.",
-                function.arity, arg_count
+                closure.function.arity, arg_count
             )));
         }
         if self.frames.len() == FRAME_MAX_SIZE {
             return Err(self.runtime_error("Stack overflow."));
         }
 
-        let call_frame = CallFrame::new(function, self.stack.len() - arg_count as usize - 1);
+        let call_frame = CallFrame::new(closure, self.stack.len() - arg_count as usize - 1);
         self.frames.push(call_frame);
         Ok(())
+    }
+
+    fn capture_upvalue(&mut self, location: usize) -> Upvalue {
+        let created_upvalue = Upvalue::new(location);
+
+        created_upvalue
     }
 }
 
 struct CallFrame {
-    function: Function,
+    closure: Closure,
     ip: usize,
     slot_start: usize,
 }
 
 impl CallFrame {
-    fn new(function: Function, slot_start: usize) -> Self {
+    fn new(closure: Closure, slot_start: usize) -> Self {
         Self {
             ip: 0,
-            function,
+            closure,
             slot_start,
         }
     }

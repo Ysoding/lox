@@ -3,6 +3,7 @@ use crate::Value;
 #[derive(Clone, Copy, Debug)]
 pub enum OpCode {
     Return,
+    Closure(u8),
     Constant(u8),
     ConstantLong(u32),
     Nil,
@@ -16,6 +17,9 @@ pub enum OpCode {
     Print,
     Pop,
     DefineGlobal(u8),
+    GetUpvalue(u8),
+    SetUpvalue(u8),
+    CloseUpvalue,
     GetGlobal(u8),
     SetGlobal(u8),
     GetLocal(u8),
@@ -102,6 +106,12 @@ impl Chunk {
     }
 
     pub fn disassemble_instruction(&self, offset: usize) -> usize {
+        use std::sync::Once;
+
+        static ONCE_TITLE: Once = Once::new();
+        ONCE_TITLE.call_once(|| {
+            println!("{:4} {:4} {:16} CIndex Constvalue", "IP", "Line", "OPCode",);
+        });
         print!("{:04} ", offset);
 
         if offset > 0 && self.line(offset) == self.line(offset - 1) {
@@ -191,9 +201,33 @@ impl Chunk {
             OpCode::Call(arg_count) => {
                 self.byte_instruction("OP_CALL", *arg_count);
             }
+            OpCode::Closure(c) => {
+                println!(
+                    "{:-16} {:4} '{}'",
+                    "OP_CLOSURE", c, self.constants[*c as usize]
+                );
+
+                let function = self.constants[*c as usize].clone().as_function().unwrap();
+                use crate::FunctionUpvalue;
+
+                function.upvalues.iter().for_each(|upvalue| {
+                    let FunctionUpvalue { index, is_local } = *upvalue;
+                    println!(
+                        "{:04}    | {:-22} {:4} {}",
+                        offset,
+                        "",
+                        if is_local { "local" } else { "upvalue" },
+                        index,
+                    );
+                });
+            }
+            OpCode::GetUpvalue(c) => self.byte_instruction("OP_GET_UPVALUE", *c),
+            OpCode::SetUpvalue(c) => self.byte_instruction("OP_SET_UPVALUE", *c),
+            OpCode::CloseUpvalue => self.simple_instruction("OP_CLOSE_UPVALUE"),
         }
         offset + 1
     }
+
     fn simple_instruction(&self, name: &str) {
         println!("{}", name);
     }

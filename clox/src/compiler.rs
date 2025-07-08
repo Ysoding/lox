@@ -1,7 +1,9 @@
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use std::{array, mem, ops::Add, u16};
 
-use crate::{Function, FunctionType, LoxError, OpCode, Scanner, Token, TokenType, Value};
+use crate::{
+    Function, FunctionType, FunctionUpvalue, LoxError, OpCode, Scanner, Token, TokenType, Value,
+};
 
 pub fn compile(source_code: &str) -> Result<Function, LoxError> {
     let parser = Parser::new(source_code);
@@ -40,12 +42,49 @@ impl<'a> Compiler<'a> {
             .find(|&i| self.locals[i].name.lexeme.eq(name.lexeme))
             .map(|i| (i as u8, self.locals[i].depth))
     }
+
+    fn resolve_upvalue(&mut self, name: Token<'a>) -> Result<Option<(u8, isize)>, &'static str> {
+        if let Some(enclosing) = self.enclosing.as_mut() {
+            if let Some((index, depth)) = enclosing.resolve_local(name) {
+                enclosing.locals[index as usize].is_captured = true;
+                let index = self.add_upvalue(index, true)?;
+                return Ok(Some((index as u8, depth)));
+            }
+
+            if let Some((index, depth)) = enclosing.resolve_upvalue(name)? {
+                let index = self.add_upvalue(index, false)?;
+                return Ok(Some((index as u8, depth)));
+            }
+        }
+        Ok(None)
+    }
+
+    fn add_upvalue(&mut self, index: u8, is_local: bool) -> Result<usize, &'static str> {
+        if let Some(i) = self
+            .function
+            .upvalues
+            .iter()
+            .position(|u| u.index == index && u.is_local == is_local)
+        {
+            return Ok(i);
+        }
+
+        if self.function.upvalues.len() == MAX_LOCAL_SIZE {
+            return Err("Too many closure variables in function.");
+        }
+
+        self.function
+            .upvalues
+            .push(FunctionUpvalue { index, is_local });
+        Ok(self.function.upvalues.len() - 1)
+    }
 }
 
 #[derive(Clone, Default)]
 struct Local<'a> {
-    name: Token<'a>,
-    depth: isize,
+    pub name: Token<'a>,
+    pub depth: isize,
+    pub is_captured: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, IntoPrimitive, TryFromPrimitive)]
@@ -604,7 +643,7 @@ impl<'a> Parser<'a> {
 
         let compiler = self.pop_compiler();
         let constant = self.make_constant(Value::Function(compiler.function));
-        self.emit_byte(OpCode::Constant(constant as u8));
+        self.emit_byte(OpCode::Closure(constant as u8));
     }
 
     fn push_compiler(&mut self, function_type: FunctionType) {
@@ -690,6 +729,14 @@ impl<'a> Parser<'a> {
                 return;
             }
             (OpCode::GetLocal(pos as u8), OpCode::SetLocal(pos as u8))
+        } else if let Some((pos, _)) = self
+            .compiler
+            .resolve_upvalue(name)
+            .inspect_err(|err| self.error(err))
+            .ok()
+            .flatten()
+        {
+            (OpCode::GetUpvalue(pos), OpCode::SetUpvalue(pos))
         } else {
             let arg = self.identifier_constant(name.lexeme);
             (OpCode::GetGlobal(arg as u8), OpCode::SetGlobal(arg as u8))
@@ -720,7 +767,11 @@ impl<'a> Parser<'a> {
         while self.compiler.local_count > 0
             && self.compiler.locals[self.compiler.local_count - 1].depth > self.compiler.scope_depth
         {
-            self.emit_byte(OpCode::Pop);
+            if self.compiler.locals[self.compiler.local_count - 1].is_captured {
+                self.emit_byte(OpCode::CloseUpvalue);
+            } else {
+                self.emit_byte(OpCode::Pop);
+            }
             self.compiler.local_count -= 1;
         }
     }
@@ -735,6 +786,7 @@ impl<'a> Parser<'a> {
         self.compiler.local_count += 1;
         local.name = name;
         local.depth = UNINITIALIZED_LOCAL_DEPTH;
+        local.is_captured = false;
     }
 
     fn mark_initialized(&mut self) {

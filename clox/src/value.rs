@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use anyhow::Result;
 
-use crate::{Function, NativeFunction};
+use crate::{Closure, Function, NativeFunction};
 
 #[derive(Clone, Debug)]
 pub enum Value {
@@ -10,6 +10,7 @@ pub enum Value {
     String(String),
     Bool(bool),
     Function(Function),
+    Closure(Closure),
     NativeFunction(NativeFunction),
     Nil,
 }
@@ -36,6 +37,13 @@ impl Value {
         }
     }
 
+    pub fn as_closure(self) -> Result<Closure, String> {
+        match self {
+            Value::Closure(c) => Ok(c),
+            _ => Err("cannot convert to Closure".into()),
+        }
+    }
+
     pub fn as_function(self) -> Result<Function, String> {
         match self {
             Value::Function(f) => Ok(f),
@@ -49,6 +57,10 @@ impl Value {
             Value::Bool(v) => *v,
             _ => false,
         }
+    }
+
+    pub fn is_closure(&self) -> bool {
+        matches!(self, Value::Closure(_))
     }
 
     pub fn is_boolean(&self) -> bool {
@@ -119,10 +131,11 @@ impl Display for Value {
                 if function.name.is_empty() {
                     write!(f, "<script>")
                 } else {
-                    write!(f, "<fn {}>", function.name)
+                    write!(f, "{}", function)
                 }
             }
             Value::NativeFunction(_) => write!(f, "<native fn>"),
+            Value::Closure(closure) => write!(f, "{}", closure.function),
         }
     }
 }
