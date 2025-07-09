@@ -1,3 +1,5 @@
+#[cfg(feature = "debug_trace_execution")]
+use crate::GcTraceFormatter;
 use crate::Value;
 
 #[derive(Clone, Copy, Debug)]
@@ -56,7 +58,7 @@ impl OpCode {
 pub struct Chunk {
     pub code: Vec<OpCode>,
     pub constants: Vec<Value>,
-    line_runs: Vec<(u32, u32)>, // (line, count)
+    pub line_runs: Vec<(u32, u32)>, // (line, count)
 }
 
 impl Chunk {
@@ -96,16 +98,16 @@ impl Chunk {
 
 #[cfg(feature = "debug_trace_execution")]
 impl Chunk {
-    pub fn disassemble(&self, name: &str) {
+    pub fn disassemble(&self, name: &str, gc: &Gc) {
         println!("\n== {} ==>", name);
         let mut offset = 0;
         while offset < self.code.len() {
-            offset = self.disassemble_instruction(offset);
+            offset = self.disassemble_instruction(offset, gc);
         }
         println!("<== {} ==\n", name);
     }
 
-    pub fn disassemble_instruction(&self, offset: usize) -> usize {
+    pub fn disassemble_instruction(&self, offset: usize, gc: &Gc) -> usize {
         use std::sync::Once;
 
         static ONCE_TITLE: Once = Once::new();
@@ -129,10 +131,10 @@ impl Chunk {
                 self.simple_instruction("OP_NEGATE");
             }
             OpCode::Constant(c) => {
-                self.constant_instruction("OP_CONSTANT", *c);
+                self.constant_instruction("OP_CONSTANT", *c, gc);
             }
             OpCode::ConstantLong(c) => {
-                self.constant_long_instruction("OP_CONSTANT_LONG", *c);
+                self.constant_long_instruction("OP_CONSTANT_LONG", *c, gc);
             }
             OpCode::Unknown => {}
             OpCode::Add => {
@@ -175,13 +177,13 @@ impl Chunk {
                 self.simple_instruction("OP_POP");
             }
             OpCode::DefineGlobal(constant) => {
-                self.constant_instruction("OP_DEFINE_GLOBAL", *constant);
+                self.constant_instruction("OP_DEFINE_GLOBAL", *constant, gc);
             }
             OpCode::GetGlobal(constant) => {
-                self.constant_instruction("OP_GET_GLOBAL", *constant);
+                self.constant_instruction("OP_GET_GLOBAL", *constant, gc);
             }
             OpCode::SetGlobal(constant) => {
-                self.constant_instruction("OP_SET_GLOBAL", *constant);
+                self.constant_instruction("OP_SET_GLOBAL", *constant, gc);
             }
             OpCode::GetLocal(slot) => {
                 self.byte_instruction("OP_GET_LOCAL", *slot);
@@ -204,12 +206,14 @@ impl Chunk {
             OpCode::Closure(c) => {
                 println!(
                     "{:-16} {:4} '{}'",
-                    "OP_CLOSURE", c, self.constants[*c as usize]
+                    "OP_CLOSURE",
+                    c,
+                    GcTraceFormatter::new(self.constants[*c as usize], gc)
                 );
 
+                use crate::{FunctionUpvalue, gc};
                 let function = self.constants[*c as usize].clone().as_function().unwrap();
-                use crate::FunctionUpvalue;
-
+                let function = gc.deref(function);
                 function.upvalues.iter().for_each(|upvalue| {
                     let FunctionUpvalue { index, is_local } = *upvalue;
                     println!(
@@ -232,17 +236,21 @@ impl Chunk {
         println!("{}", name);
     }
 
-    fn constant_long_instruction(&self, name: &str, constant: u32) {
+    fn constant_long_instruction(&self, name: &str, constant: u32, gc: &Gc) {
         println!(
             "{:-16} {:4} '{}'",
-            name, constant, self.constants[constant as usize]
+            name,
+            constant,
+            GcTraceFormatter::new(self.constants[constant as usize], gc)
         );
     }
 
-    fn constant_instruction(&self, name: &str, constant: u8) {
+    fn constant_instruction(&self, name: &str, constant: u8, gc: &Gc) {
         println!(
             "{:-16} {:4} '{}'",
-            name, constant, self.constants[constant as usize]
+            name,
+            constant,
+            GcTraceFormatter::new(self.constants[constant as usize], gc)
         );
     }
 

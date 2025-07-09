@@ -1,8 +1,10 @@
-use std::{cell::RefCell, fmt::Display, rc::Rc};
+use std::{collections::HashMap, mem};
 
-use crate::{Chunk, Value};
+use crate::{Chunk, GcRef, GcTrace, OpCode, Value};
 
 pub type NativeFunction = fn(Vec<Value>) -> Value;
+
+pub type Table = HashMap<GcRef<String>, Value>;
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum FunctionType {
@@ -20,35 +22,63 @@ pub struct FunctionUpvalue {
 pub struct Function {
     pub arity: u8,
     pub chunk: Chunk,
-    pub name: String,
+    pub name: GcRef<String>,
     pub upvalues: Vec<FunctionUpvalue>,
 }
 
 impl Function {
-    pub fn new(name: &str) -> Self {
+    pub fn new(name: GcRef<String>) -> Self {
         Self {
             arity: 0,
             chunk: Chunk::new(),
-            name: name.to_string(),
+            name,
             upvalues: Vec::new(),
         }
     }
 }
 
-impl Display for Function {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "<fn {}>", self.name)
+impl GcTrace for Function {
+    fn format(&self, f: &mut std::fmt::Formatter, gc: &crate::Gc) -> std::fmt::Result {
+        let name = gc.deref(self.name);
+        if name.is_empty() {
+            write!(f, "<script>")
+        } else {
+            write!(f, "<fn {}>", name)
+        }
+    }
+
+    fn size(&self) -> usize {
+        mem::size_of::<Function>()
+            + self.upvalues.capacity() * mem::size_of::<FunctionUpvalue>()
+            + self.chunk.code.capacity() * mem::size_of::<OpCode>()
+            + self.chunk.constants.capacity() * mem::size_of::<Value>()
+            + self.chunk.line_runs.capacity() * mem::size_of::<(u32, u32)>()
+    }
+
+    fn trace(&self, gc: &mut crate::Gc) {
+        gc.mark_object(self.name);
+        self.chunk.constants.iter().for_each(|&constant| {
+            gc.mark_value(constant);
+        });
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct Closure {
-    pub function: Function,
-    pub upvalues: Vec<Upvalue>,
+    pub function: GcRef<Function>,
+    pub upvalues: Vec<GcRef<Upvalue>>,
 }
 
 impl Closure {
-    pub fn new(function: Function) -> Self {
+    pub fn new(function: GcRef<Function>) -> Self {
         Self {
             function,
             upvalues: vec![],
@@ -56,9 +86,29 @@ impl Closure {
     }
 }
 
-impl Display for Closure {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.function)
+impl GcTrace for Closure {
+    fn format(&self, f: &mut std::fmt::Formatter, gc: &crate::Gc) -> std::fmt::Result {
+        let function = gc.deref(self.function);
+        function.format(f, gc)
+    }
+
+    fn size(&self) -> usize {
+        mem::size_of::<Closure>() + self.upvalues.capacity() * mem::size_of::<GcRef<Upvalue>>()
+    }
+
+    fn trace(&self, gc: &mut crate::Gc) {
+        gc.mark_object(self.function);
+        self.upvalues.iter().for_each(|&upvalue| {
+            gc.mark_object(upvalue);
+        });
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
     }
 }
 
@@ -66,7 +116,6 @@ impl Display for Closure {
 pub struct Upvalue {
     pub location: usize,
     pub closed: Option<Value>,
-    pub next: Option<Rc<RefCell<Upvalue>>>,
 }
 
 impl Upvalue {
@@ -74,7 +123,30 @@ impl Upvalue {
         Upvalue {
             location,
             closed: None,
-            next: None,
         }
+    }
+}
+
+impl GcTrace for Upvalue {
+    fn format(&self, f: &mut std::fmt::Formatter, _gc: &crate::Gc) -> std::fmt::Result {
+        write!(f, "upvalue")
+    }
+
+    fn size(&self) -> usize {
+        mem::size_of::<Upvalue>()
+    }
+
+    fn trace(&self, gc: &mut crate::Gc) {
+        if let Some(obj) = self.closed {
+            gc.mark_value(obj);
+        }
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
     }
 }

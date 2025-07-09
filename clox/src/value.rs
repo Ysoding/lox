@@ -1,16 +1,14 @@
-use std::fmt::Display;
-
 use anyhow::Result;
 
-use crate::{Closure, Function, NativeFunction};
+use crate::{Closure, Function, GcRef, GcTrace, NativeFunction};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub enum Value {
     Number(f64),
-    String(String),
     Bool(bool),
-    Function(Function),
-    Closure(Closure),
+    String(GcRef<String>),
+    Function(GcRef<Function>),
+    Closure(GcRef<Closure>),
     NativeFunction(NativeFunction),
     Nil,
 }
@@ -23,7 +21,7 @@ impl Value {
         }
     }
 
-    pub fn as_string(self) -> Result<String, String> {
+    pub fn as_string(self) -> Result<GcRef<String>, String> {
         match self {
             Value::String(s) => Ok(s),
             _ => Err("cannot convert to String".into()),
@@ -37,14 +35,14 @@ impl Value {
         }
     }
 
-    pub fn as_closure(self) -> Result<Closure, String> {
+    pub fn as_closure(self) -> Result<GcRef<Closure>, String> {
         match self {
             Value::Closure(c) => Ok(c),
             _ => Err("cannot convert to Closure".into()),
         }
     }
 
-    pub fn as_function(self) -> Result<Function, String> {
+    pub fn as_function(self) -> Result<GcRef<Function>, String> {
         match self {
             Value::Function(f) => Ok(f),
             _ => Err("cannot convert to Function".into()),
@@ -114,28 +112,37 @@ impl From<bool> for Value {
     }
 }
 
-impl From<&str> for Value {
-    fn from(value: &str) -> Self {
-        Self::String(value.to_string())
-    }
-}
-
-impl Display for Value {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl GcTrace for Value {
+    fn format(&self, f: &mut std::fmt::Formatter, gc: &crate::Gc) -> std::fmt::Result {
         match self {
-            Value::Number(v) => write!(f, "{}", v),
             Value::Nil => write!(f, "nil"),
-            Value::Bool(v) => write!(f, "{}", v),
-            Value::String(v) => write!(f, "{}", v),
-            Value::Function(function) => {
-                if function.name.is_empty() {
-                    write!(f, "<script>")
-                } else {
-                    write!(f, "{}", function)
-                }
-            }
             Value::NativeFunction(_) => write!(f, "<native fn>"),
-            Value::Closure(closure) => write!(f, "{}", closure.function),
+            Value::Number(v) => write!(f, "{}", v),
+            Value::Bool(v) => write!(f, "{}", v),
+            Value::String(v) => gc.deref(*v).format(f, gc),
+            Value::Function(v) => gc.deref(*v).format(f, gc),
+            Value::Closure(v) => gc.deref(*v).format(f, gc),
         }
+    }
+
+    fn size(&self) -> usize {
+        0
+    }
+
+    fn trace(&self, gc: &mut crate::Gc) {
+        match self {
+            Value::String(v) => gc.mark_object(*v),
+            Value::Function(v) => gc.mark_object(*v),
+            Value::Closure(v) => gc.mark_object(*v),
+            _ => {}
+        }
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        panic!("Value should not be allocated")
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        panic!("Value should not be allocated")
     }
 }

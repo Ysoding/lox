@@ -14,3 +14,5 @@ mod object;
 pub use object::*;
 mod builtins;
 pub use builtins::*;
+mod gc;
+pub use gc::*;

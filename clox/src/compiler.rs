@@ -2,11 +2,12 @@ use num_enum::{IntoPrimitive, TryFromPrimitive};
 use std::{array, mem, ops::Add, u16};
 
 use crate::{
-    Function, FunctionType, FunctionUpvalue, LoxError, OpCode, Scanner, Token, TokenType, Value,
+    Function, FunctionType, FunctionUpvalue, Gc, GcRef, LoxError, OpCode, Scanner, Token,
+    TokenType, Value,
 };
 
-pub fn compile(source_code: &str) -> Result<Function, LoxError> {
-    let parser = Parser::new(source_code);
+pub fn compile(source_code: &str, gc: &mut Gc) -> Result<GcRef<Function>, LoxError> {
+    let parser = Parser::new(source_code, gc);
     parser.compile()
 }
 
@@ -23,7 +24,7 @@ struct Compiler<'a> {
 }
 
 impl<'a> Compiler<'a> {
-    fn new(function_type: FunctionType, name: &str) -> Box<Self> {
+    fn new(function_type: FunctionType, name: GcRef<String>) -> Box<Self> {
         let compiler = Self {
             locals: array::from_fn(|_| Local::default()),
             local_count: 1,
@@ -118,17 +119,20 @@ struct Parser<'a> {
     had_error: bool,
     panic_mode: bool,
     compiler: Box<Compiler<'a>>,
+    gc: &'a mut Gc,
 }
 
 impl<'a> Parser<'a> {
-    fn new(source: &'a str) -> Self {
+    fn new(source: &'a str, gc: &'a mut Gc) -> Self {
+        let function_name = gc.intern("script".to_owned());
         Self {
+            gc,
             scanner: Scanner::new(source),
             previous: Token::default(),
             current: Token::default(),
             had_error: false,
             panic_mode: false,
-            compiler: Compiler::new(FunctionType::Script, ""),
+            compiler: Compiler::new(FunctionType::Script, function_name),
         }
     }
 
@@ -146,7 +150,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn compile(mut self) -> Result<Function, LoxError> {
+    fn compile(mut self) -> Result<GcRef<Function>, LoxError> {
         self.had_error = false;
         self.panic_mode = false;
 
@@ -162,7 +166,7 @@ impl<'a> Parser<'a> {
             return Err(LoxError::CompileError);
         }
 
-        Ok(self.compiler.function)
+        Ok(self.gc.alloc(self.compiler.function))
     }
 
     fn consume(&mut self, typ: TokenType, msg: &str) {
@@ -213,13 +217,8 @@ impl<'a> Parser<'a> {
         #[cfg(feature = "debug_trace_execution")]
         {
             if !self.had_error {
-                self.compiler.function.chunk.disassemble(
-                    if self.compiler.function.name.is_empty() {
-                        "script"
-                    } else {
-                        &self.compiler.function.name
-                    },
-                );
+                let name = self.gc.deref(self.compiler.function.name);
+                self.compiler.function.chunk.disassemble(name, &self.gc);
             }
         }
 
@@ -361,9 +360,9 @@ impl<'a> Parser<'a> {
     }
 
     fn string(&mut self, _can_assign: bool) {
-        self.emit_constant(Value::String(
-            self.previous.lexeme[1..self.previous.lexeme.len() - 1].to_string(),
-        ));
+        let value = &self.previous.lexeme[1..self.previous.lexeme.len() - 1];
+        let s = self.gc.intern(value.to_owned());
+        self.emit_constant(Value::String(s));
     }
 
     fn literal(&mut self, _can_assign: bool) {
@@ -642,12 +641,13 @@ impl<'a> Parser<'a> {
         self.block();
 
         let compiler = self.pop_compiler();
-        let constant = self.make_constant(Value::Function(compiler.function));
+        let function = self.gc.alloc(compiler.function);
+        let constant = self.make_constant(Value::Function(function));
         self.emit_byte(OpCode::Closure(constant as u8));
     }
 
     fn push_compiler(&mut self, function_type: FunctionType) {
-        let function_name = self.previous.lexeme;
+        let function_name = self.gc.intern(self.previous.lexeme.to_owned());
         let new_compiler = Compiler::new(function_type, function_name);
         let old_compiler = mem::replace(&mut self.compiler, new_compiler);
         self.compiler.enclosing = Some(old_compiler);
@@ -719,7 +719,8 @@ impl<'a> Parser<'a> {
     }
 
     fn identifier_constant(&mut self, identifier: &str) -> usize {
-        self.make_constant(identifier.into())
+        let v = self.gc.intern(identifier.to_owned());
+        self.make_constant(Value::String(v))
     }
 
     fn named_variable(&mut self, name: Token<'a>, can_assign: bool) {
