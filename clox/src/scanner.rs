@@ -64,6 +64,14 @@ impl<'a> Token<'a> {
     pub fn new(typ: TokenType, lexeme: &'a str, line: u32) -> Self {
         Self { lexeme, line, typ }
     }
+
+    pub fn synthetic(lexeme: &'a str) -> Self {
+        Self {
+            lexeme,
+            line: 0,
+            typ: TokenType::Error,
+        }
+    }
 }
 
 impl Default for Token<'_> {

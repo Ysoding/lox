@@ -5,6 +5,8 @@ use crate::{FunctionUpvalue, Gc, GcTraceFormatter};
 #[derive(Clone, Copy, Debug)]
 pub enum OpCode {
     Return,
+    Invoke((u8, u8)),
+    Method(u8),
     SetProperty(u8),
     GetProperty(u8),
     Class(u8),
@@ -233,8 +235,23 @@ impl Chunk {
             OpCode::Class(c) => self.constant_instruction("OP_CLASS", *c, gc),
             OpCode::SetProperty(c) => self.constant_instruction("OP_SET_PROPERTY", *c, gc),
             OpCode::GetProperty(c) => self.constant_instruction("OP_GET_PROPERTY", *c, gc),
+            OpCode::Method(c) => self.constant_instruction("OP_METHOD", *c, gc),
+            OpCode::Invoke((name_constant, arg_count)) => {
+                self.invoke_instruction("OP_INVOKEK", *name_constant, *arg_count, gc)
+            }
         }
         offset + 1
+    }
+
+    fn invoke_instruction(&self, name: &str, constant_index: u8, args: u8, gc: &Gc) {
+        let value = self.constants[constant_index as usize];
+        println!(
+            "{:<16} {:4} ({}) {}",
+            name,
+            constant_index,
+            GcTraceFormatter::new(value, gc),
+            args
+        );
     }
 
     fn simple_instruction(&self, name: &str) {

@@ -26,7 +26,24 @@ struct Compiler<'a> {
 impl<'a> Compiler<'a> {
     fn new(function_type: FunctionType, name: GcRef<String>) -> Box<Self> {
         let compiler = Self {
-            locals: array::from_fn(|_| Local::default()),
+            locals: array::from_fn(|i| {
+                if i == 0 {
+                    let name = match function_type {
+                        FunctionType::Method | FunctionType::Initializer => {
+                            Token::synthetic("this")
+                        }
+                        _ => Token::synthetic(""),
+                    };
+
+                    Local {
+                        name,
+                        depth: 0,
+                        is_captured: false,
+                    }
+                } else {
+                    Local::default()
+                }
+            }),
             local_count: 1,
             scope_depth: 0,
             function: Function::new(name),
@@ -119,6 +136,7 @@ struct Parser<'a> {
     had_error: bool,
     panic_mode: bool,
     compiler: Box<Compiler<'a>>,
+    class_compiler: Option<Box<ClassCompiler>>,
     gc: &'a mut Gc,
 }
 
@@ -133,6 +151,7 @@ impl<'a> Parser<'a> {
             had_error: false,
             panic_mode: false,
             compiler: Compiler::new(FunctionType::Script, function_name),
+            class_compiler: None,
         }
     }
 
@@ -222,7 +241,11 @@ impl<'a> Parser<'a> {
             }
         }
 
-        self.emit_byte(OpCode::Nil);
+        match self.compiler.function_type {
+            FunctionType::Initializer => self.emit_byte(OpCode::GetLocal(0)),
+            _ => self.emit_byte(OpCode::Nil),
+        }
+
         self.emit_byte(OpCode::Return);
     }
 
@@ -326,6 +349,9 @@ impl<'a> Parser<'a> {
         if can_assign && self._match(TokenType::Equal) {
             self.expression();
             self.emit_byte(OpCode::SetProperty(name));
+        } else if self._match(TokenType::LeftParen) {
+            let arg_count = self.argument_list();
+            self.emit_byte(OpCode::Invoke((name, arg_count)));
         } else {
             self.emit_byte(OpCode::GetProperty(name));
         }
@@ -375,6 +401,14 @@ impl<'a> Parser<'a> {
         let value = &self.previous.lexeme[1..self.previous.lexeme.len() - 1];
         let s = self.gc.intern(value.to_owned());
         self.emit_constant(Value::String(s));
+    }
+
+    fn this(&mut self, _can_assign: bool) {
+        if self.class_compiler.is_none() {
+            self.error("Can't use 'this' outside of a class.");
+            return;
+        }
+        self.variable(false);
     }
 
     fn literal(&mut self, _can_assign: bool) {
@@ -445,14 +479,45 @@ impl<'a> Parser<'a> {
 
     fn class_declaration(&mut self) {
         self.consume(TokenType::Identifier, "Expect class name.");
+        let class_name = self.previous;
         let name_constant = self.identifier_constant(self.previous.lexeme);
         self.declare_variable();
 
         self.emit_byte(OpCode::Class(name_constant as u8));
         self.define_variable(name_constant);
 
+        let old_class_compiler = self.class_compiler.take();
+        let new_class_compiler = ClassCompiler::new(old_class_compiler);
+        self.class_compiler.replace(new_class_compiler);
+
+        self.named_variable(class_name, false);
+
         self.consume(TokenType::LeftBrace, "Expect '{' before class body.");
+        while !self.check(TokenType::RightBrace) && !self.check(TokenType::Eof) {
+            self.method();
+        }
         self.consume(TokenType::RightBrace, "Expect '}' after class body.");
+        self.emit_byte(OpCode::Pop);
+
+        match self.class_compiler.take() {
+            Some(c) => self.class_compiler = c.enclosing,
+            None => self.class_compiler = None,
+        }
+    }
+
+    fn method(&mut self) {
+        self.consume(TokenType::Identifier, "Expect method name.");
+        let name = self.previous.lexeme;
+        let constant = self.identifier_constant(name);
+
+        let function_type = if name == "init" {
+            FunctionType::Initializer
+        } else {
+            FunctionType::Method
+        };
+
+        self.function(function_type);
+        self.emit_byte(OpCode::Method(constant as u8));
     }
 
     fn statement(&mut self) {
@@ -483,6 +548,9 @@ impl<'a> Parser<'a> {
         if self._match(TokenType::Semicolon) {
             self.emit_return();
         } else {
+            if self.compiler.function_type == FunctionType::Initializer {
+                self.error("Can't return a value from an initializer.");
+            }
             self.expression();
             self.consume(TokenType::Semicolon, "Expect ';' after return value.");
             self.emit_byte(OpCode::Return);
@@ -887,7 +955,7 @@ impl<'a> ParseRule<'a> {
             TokenType::Print => Self::new(None, None, Precedence::None),
             TokenType::Return => Self::new(None, None, Precedence::None),
             TokenType::Super => Self::new(None, None, Precedence::None),
-            TokenType::This => Self::new(None, None, Precedence::None),
+            TokenType::This => Self::new(Some(Parser::this), None, Precedence::None),
             TokenType::True => Self::new(Some(Parser::literal), None, Precedence::None),
             TokenType::Var => Self::new(None, None, Precedence::None),
             TokenType::While => Self::new(None, None, Precedence::None),
@@ -895,5 +963,15 @@ impl<'a> ParseRule<'a> {
             TokenType::Eof => Self::new(None, None, Precedence::None),
             TokenType::Error => Self::new(None, None, Precedence::None),
         }
+    }
+}
+
+struct ClassCompiler {
+    enclosing: Option<Box<ClassCompiler>>,
+}
+
+impl ClassCompiler {
+    fn new(enclosing: Option<Box<ClassCompiler>>) -> Box<Self> {
+        Box::new(ClassCompiler { enclosing })
     }
 }

@@ -1,6 +1,6 @@
 use anyhow::Result;
 
-use crate::{Class, Closure, Function, GcRef, GcTrace, Instance, NativeFunction};
+use crate::{BoundMethod, Class, Closure, Function, GcRef, GcTrace, Instance, NativeFunction};
 
 #[derive(Clone, Copy, Debug)]
 pub enum Value {
@@ -13,6 +13,7 @@ pub enum Value {
     Closure(GcRef<Closure>),
     Class(GcRef<Class>),
     Instance(GcRef<Instance>),
+    BoundMethod(GcRef<BoundMethod>),
 }
 
 impl Value {
@@ -27,6 +28,13 @@ impl Value {
         match self {
             Value::String(s) => Ok(s),
             _ => Err("cannot convert to String".into()),
+        }
+    }
+
+    pub fn as_bound_method(self) -> Result<GcRef<BoundMethod>, String> {
+        match self {
+            Value::BoundMethod(v) => Ok(v),
+            _ => Err("cannot convert to BoundMethod".into()),
         }
     }
 
@@ -148,6 +156,7 @@ impl GcTrace for Value {
             Value::Closure(v) => gc.deref(*v).format(f, gc),
             Value::Class(v) => gc.deref(*v).format(f, gc),
             Value::Instance(v) => gc.deref(*v).format(f, gc),
+            Value::BoundMethod(v) => gc.deref(*v).format(f, gc),
         }
     }
 

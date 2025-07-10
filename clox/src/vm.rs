@@ -3,7 +3,7 @@ use std::fmt::Debug;
 use anyhow::Result;
 
 use crate::{
-    Chunk, Class, Closure, Gc, GcRef, GcTrace, GcTraceFormatter, Instance, LoxError,
+    BoundMethod, Chunk, Class, Closure, Gc, GcRef, GcTrace, GcTraceFormatter, Instance, LoxError,
     NativeFunction, OpCode, Table, Upvalue, Value, clock, compile,
 };
 
@@ -24,16 +24,21 @@ pub struct VirtualMachine {
     frames: Vec<CallFrame>,
     open_upvalues: Vec<GcRef<Upvalue>>,
     gc: Gc,
+    init_string: GcRef<String>,
 }
 
 impl VirtualMachine {
     pub fn new() -> Self {
+        let mut gc = Gc::new();
+        let init_string = gc.intern("init".to_owned());
+
         let mut vm = Self {
             stack: Vec::with_capacity(STACK_MAX_SIZE),
             globals: Table::new(),
             frames: Vec::with_capacity(FRAME_MAX_SIZE),
             open_upvalues: Vec::new(),
-            gc: Gc::new(),
+            gc,
+            init_string,
         };
         vm.define_native("clock", clock);
         vm
@@ -342,14 +347,29 @@ impl VirtualMachine {
                             self.push(v);
                         }
                         None => {
-                            let name = self.gc.deref(name);
-                            let msg = format!("Undefined property '{}'.", name);
-                            return Err(self.runtime_error(&msg));
+                            self.bind_method(instance.class, name)?;
                         }
                     }
                 }
+                OpCode::Method(c) => {
+                    let name = self.read_constant(c as usize).as_string().unwrap();
+                    self.define_method(name);
+                }
+                OpCode::Invoke((c, arg_count)) => {
+                    let name = self.read_constant(c as usize).as_string().unwrap();
+                    self.invoke(name, arg_count)?;
+                }
             }
         }
+    }
+
+    fn define_method(&mut self, name: GcRef<String>) {
+        let method = self.peek(0);
+        let class = self.peek(1).as_class().unwrap();
+
+        let class = self.gc.deref_mut(class);
+        class.methods.insert(name, method);
+        self.pop();
     }
 
     fn read_instruction(&self, instruction: usize) -> OpCode {
@@ -424,12 +444,35 @@ impl VirtualMachine {
     fn call_value(&mut self, arg_count: u8) -> Result<(), LoxError> {
         let callee = self.peek(arg_count as usize);
         match callee {
+            Value::BoundMethod(bound) => {
+                let bound = self.gc.deref(bound);
+                let method = bound.method;
+                let receiver = bound.receiver;
+
+                let pos = self.stack.len() - 1 - arg_count as usize;
+                self.stack[pos] = receiver;
+
+                self.call(method, arg_count)?;
+            }
             Value::Function(_f) => {}
             Value::Class(class) => {
                 let instance = Instance::new(class);
                 let instance = self.alloc(instance);
                 let pos = self.stack.len() - 1 - arg_count as usize;
                 self.stack[pos] = Value::Instance(instance);
+
+                let class = self.gc.deref(class);
+                if let Some(&initializer) = class.methods.get(&self.init_string) {
+                    let initializer = initializer
+                        .as_closure()
+                        .map_err(|_msg| self.runtime_error("Initializer is not closure"))?;
+
+                    self.call(initializer, arg_count)?;
+                } else if arg_count != 0 {
+                    return Err(
+                        self.runtime_error(&format!("Expected 0 arguments but got {}.", arg_count))
+                    );
+                }
             }
             Value::NativeFunction(f) => {
                 let left = self.stack.len() - arg_count as usize;
@@ -501,8 +544,71 @@ impl VirtualMachine {
             }
         }
     }
-}
 
+    fn bind_method(&mut self, class: GcRef<Class>, name: GcRef<String>) -> Result<(), LoxError> {
+        let class = self.gc.deref(class);
+        match class.methods.get(&name) {
+            Some(method) => {
+                let receiver = self.peek(0);
+                let method = method.as_closure().unwrap();
+
+                let bound = self.alloc(BoundMethod::new(receiver, method));
+                self.pop();
+                self.push(Value::BoundMethod(bound));
+
+                Ok(())
+            }
+            None => {
+                let name = self.gc.deref(name);
+                let msg = format!("Undefined property '{}'.", name);
+                Err(self.runtime_error(&msg))
+            }
+        }
+    }
+
+    fn invoke(&mut self, name: GcRef<String>, arg_count: u8) -> Result<(), LoxError> {
+        let receiver = self.peek(arg_count as usize);
+
+        let instance = receiver
+            .as_instance()
+            .map_err(|_msg| self.runtime_error("Only instances have methods."))?;
+
+        let instance = self.gc.deref(instance);
+
+        match instance.fields.get(&name) {
+            Some(&field) => {
+                let pos = self.stack.len() - 1 - arg_count as usize;
+                self.stack[pos] = field;
+
+                self.call_value(arg_count)
+            }
+            None => {
+                let class = instance.class;
+                self.invoke_from_class(class, name, arg_count)
+            }
+        }
+    }
+
+    fn invoke_from_class(
+        &mut self,
+        class: GcRef<Class>,
+        name: GcRef<String>,
+        arg_count: u8,
+    ) -> Result<(), LoxError> {
+        let class = self.gc.deref(class);
+        match class.methods.get(&name) {
+            Some(method) => {
+                let closure = method.as_closure().unwrap();
+                self.call(closure, arg_count)
+            }
+            None => {
+                let name = self.gc.deref(name);
+                let msg = format!("Undefined property '{}'.", name);
+                Err(self.runtime_error(&msg))
+            }
+        }
+    }
+}
 struct CallFrame {
     closure: GcRef<Closure>,
     ip: usize,

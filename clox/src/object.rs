@@ -7,6 +7,42 @@ pub type NativeFunction = fn(Vec<Value>) -> Value;
 pub type Table = HashMap<GcRef<String>, Value>;
 
 #[derive(Debug)]
+pub struct BoundMethod {
+    pub receiver: Value,
+    pub method: GcRef<Closure>,
+}
+
+impl BoundMethod {
+    pub fn new(receiver: Value, method: GcRef<Closure>) -> Self {
+        Self { receiver, method }
+    }
+}
+
+impl GcTrace for BoundMethod {
+    fn format(&self, f: &mut std::fmt::Formatter, gc: &crate::Gc) -> std::fmt::Result {
+        let method = gc.deref(self.method);
+        method.format(f, gc)
+    }
+
+    fn size(&self) -> usize {
+        mem::size_of::<BoundMethod>()
+    }
+
+    fn trace(&self, gc: &mut crate::Gc) {
+        gc.mark_value(self.receiver);
+        gc.mark_object(self.method);
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
+}
+
+#[derive(Debug)]
 pub struct Instance {
     pub class: GcRef<Class>,
     pub fields: Table,
@@ -90,6 +126,8 @@ impl GcTrace for Class {
 pub enum FunctionType {
     Function,
     Script,
+    Method,
+    Initializer,
 }
 
 #[derive(Copy, Clone, Debug)]
