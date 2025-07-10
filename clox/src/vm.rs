@@ -355,15 +355,10 @@ impl VirtualMachine {
                 function.chunk.line(frame.ip - 1)
             ));
             let function_name = self.gc.deref(function.name);
-            let name = if function_name.is_empty() {
-                "script"
-            } else {
-                &format!("{}()", function_name)
-            };
-            err_msg.push_str(name);
+            err_msg.push_str(&function_name);
         });
 
-        println!("{}", err_msg);
+        eprintln!("{}", err_msg);
 
         self.reset_stack();
 
