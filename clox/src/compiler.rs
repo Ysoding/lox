@@ -411,6 +411,31 @@ impl<'a> Parser<'a> {
         self.variable(false);
     }
 
+    fn super_(&mut self, _can_assign: bool) {
+        if let Some(current_class) = self.class_compiler.as_ref() {
+            if !current_class.has_superclass {
+                self.error("Can't use 'super' in a class with no superclass.");
+            }
+        } else {
+            self.error("Can't use 'super' outside of a class.");
+        }
+
+        self.consume(TokenType::Dot, "Expect '.' after 'super'.");
+        self.consume(TokenType::Identifier, "Expect superclass method name.");
+        let name = self.identifier_constant(self.previous.lexeme);
+
+        self.named_variable(Token::synthetic("this"), false);
+
+        if self._match(TokenType::LeftParen) {
+            let arg_count = self.argument_list();
+            self.named_variable(Token::synthetic("super"), false);
+            self.emit_byte(OpCode::SuperInvoke((name as u8, arg_count)));
+        } else {
+            self.named_variable(Token::synthetic("super"), false);
+            self.emit_byte(OpCode::GetSuper(name as u8));
+        }
+    }
+
     fn literal(&mut self, _can_assign: bool) {
         match self.previous.typ {
             TokenType::False => {
@@ -490,6 +515,22 @@ impl<'a> Parser<'a> {
         let new_class_compiler = ClassCompiler::new(old_class_compiler);
         self.class_compiler.replace(new_class_compiler);
 
+        if self._match(TokenType::Less) {
+            self.consume(TokenType::Identifier, "Expect superclass name.");
+            self.variable(false);
+            if class_name.lexeme == self.previous.lexeme {
+                self.error("A class can't inherit from itself.");
+            }
+
+            self.begin_scope();
+            self.add_local(Token::synthetic("super"));
+            self.define_variable(0);
+
+            self.named_variable(class_name, false);
+            self.emit_byte(OpCode::Inherit);
+            self.class_compiler.as_mut().unwrap().has_superclass = true;
+        }
+
         self.named_variable(class_name, false);
 
         self.consume(TokenType::LeftBrace, "Expect '{' before class body.");
@@ -498,6 +539,10 @@ impl<'a> Parser<'a> {
         }
         self.consume(TokenType::RightBrace, "Expect '}' after class body.");
         self.emit_byte(OpCode::Pop);
+
+        if self.class_compiler.as_ref().unwrap().has_superclass {
+            self.end_scope();
+        }
 
         match self.class_compiler.take() {
             Some(c) => self.class_compiler = c.enclosing,
@@ -954,7 +999,7 @@ impl<'a> ParseRule<'a> {
             TokenType::Or => Self::new(None, Some(Parser::or), Precedence::None),
             TokenType::Print => Self::new(None, None, Precedence::None),
             TokenType::Return => Self::new(None, None, Precedence::None),
-            TokenType::Super => Self::new(None, None, Precedence::None),
+            TokenType::Super => Self::new(Some(Parser::super_), None, Precedence::None),
             TokenType::This => Self::new(Some(Parser::this), None, Precedence::None),
             TokenType::True => Self::new(Some(Parser::literal), None, Precedence::None),
             TokenType::Var => Self::new(None, None, Precedence::None),
@@ -968,10 +1013,14 @@ impl<'a> ParseRule<'a> {
 
 struct ClassCompiler {
     enclosing: Option<Box<ClassCompiler>>,
+    has_superclass: bool,
 }
 
 impl ClassCompiler {
     fn new(enclosing: Option<Box<ClassCompiler>>) -> Box<Self> {
-        Box::new(ClassCompiler { enclosing })
+        Box::new(ClassCompiler {
+            enclosing,
+            has_superclass: false,
+        })
     }
 }

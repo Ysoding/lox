@@ -359,6 +359,35 @@ impl VirtualMachine {
                     let name = self.read_constant(c as usize).as_string().unwrap();
                     self.invoke(name, arg_count)?;
                 }
+                OpCode::Inherit => {
+                    let superclass = self
+                        .peek(1)
+                        .as_class()
+                        .map_err(|_| self.runtime_error("Superclass must be a class."))?;
+
+                    let subclass = self
+                        .peek(0)
+                        .as_class()
+                        .map_err(|_| self.runtime_error("Subclass must be a class."))?;
+
+                    let methods = self.gc.deref(superclass).methods.clone();
+
+                    let subclass = self.gc.deref_mut(subclass);
+                    subclass.methods = methods;
+                    self.pop();
+                }
+                OpCode::GetSuper(c) => {
+                    let name = self.read_constant(c as usize).as_string().unwrap();
+                    let superclass = self.pop().as_class().unwrap();
+
+                    self.bind_method(superclass, name)?;
+                }
+                OpCode::SuperInvoke((c, arg_count)) => {
+                    let method_name = self.read_constant(c as usize).as_string().unwrap();
+
+                    let class = self.pop().as_class().unwrap();
+                    self.invoke_from_class(class, method_name, arg_count)?;
+                }
             }
         }
     }

@@ -1,0 +1,474 @@
+cargo test -p lox --test integration --no-default-features
+
+running 243 tests
+test run_file_test_tests_integration_assignment_infix_operator_lox ... ok
+test run_file_test_tests_integration_assignment_to_this_lox ... ok
+test run_file_test_tests_integration_assignment_prefix_operator_lox ... ok
+test run_file_test_tests_integration_assignment_global_lox ... ok
+test run_file_test_tests_integration_assignment_syntax_lox ... ok
+test run_file_test_tests_integration_assignment_grouping_lox ... ok
+test run_file_test_tests_integration_assignment_associativity_lox ... ok
+test run_file_test_tests_integration_assignment_local_lox ... ok
+test run_file_test_tests_integration_block_scope_lox ... ok
+test run_file_test_tests_integration_bool_not_lox ... ok
+test run_file_test_tests_integration_assignment_undefined_lox ... ok
+test run_file_test_tests_integration_bool_equality_lox ... ok
+test run_file_test_tests_integration_block_empty_lox ... ok
+test run_file_test_tests_integration_call_nil_lox ... ok
+test run_file_test_tests_integration_call_bool_lox ... ok
+test run_file_test_tests_integration_call_num_lox ... ok
+test run_file_test_tests_integration_class_inherited_method_lox ... ok
+test run_file_test_tests_integration_class_inherit_self_lox ... ok
+test run_file_test_tests_integration_class_local_inherit_other_lox ... ok
+test run_file_test_tests_integration_class_local_inherit_self_lox ... ok
+test run_file_test_tests_integration_call_string_lox ... ok
+test run_file_test_tests_integration_class_local_reference_self_lox ... ok
+test run_file_test_tests_integration_class_empty_lox ... ok
+test run_file_test_tests_integration_call_object_lox ... ok
+test run_file_test_tests_integration_class_reference_self_lox ... ok
+test run_file_test_tests_integration_closure_assign_to_closure_lox ... ok
+test run_file_test_tests_integration_closure_assign_to_shadowed_later_lox ... ok
+test run_file_test_tests_integration_closure_close_over_function_parameter_lox ... ok
+test run_file_test_tests_integration_closure_close_over_later_variable_lox ... ok
+test run_file_test_tests_integration_closure_close_over_method_parameter_lox ... ok
+test run_file_test_tests_integration_closure_open_closure_in_function_lox ... ok
+test run_file_test_tests_integration_closure_closed_closure_in_function_lox ... ok
+test run_file_test_tests_integration_closure_nested_closure_lox ... FAILED
+test run_file_test_tests_integration_closure_shadow_closure_with_local_lox ... ok
+test run_file_test_tests_integration_closure_reference_closure_multiple_times_lox ... ok
+test run_file_test_tests_integration_closure_unused_closure_lox ... ok
+test run_file_test_tests_integration_closure_reuse_closure_slot_lox ... ok
+test run_file_test_tests_integration_closure_unused_later_closure_lox ... ok
+test run_file_test_tests_integration_comments_only_line_comment_and_line_lox ... ok
+test run_file_test_tests_integration_comments_line_at_eof_lox ... ok
+test run_file_test_tests_integration_comments_only_line_comment_lox ... ok
+test run_file_test_tests_integration_constructor_arguments_lox ... ok
+test run_file_test_tests_integration_comments_unicode_lox ... ok
+test run_file_test_tests_integration_constructor_call_init_early_return_lox ... ok
+test run_file_test_tests_integration_constructor_default_arguments_lox ... ok
+test run_file_test_tests_integration_constructor_default_lox ... ok
+test run_file_test_tests_integration_constructor_early_return_lox ... ok
+test run_file_test_tests_integration_constructor_call_init_explicitly_lox ... FAILED
+test run_file_test_tests_integration_constructor_init_not_method_lox ... ok
+test run_file_test_tests_integration_constructor_extra_arguments_lox ... ok
+test run_file_test_tests_integration_constructor_missing_arguments_lox ... ok
+test run_file_test_tests_integration_field_call_function_field_lox ... ok
+test run_file_test_tests_integration_constructor_return_in_nested_function_lox ... ok
+test run_file_test_tests_integration_constructor_return_value_lox ... ok
+test run_file_test_tests_integration_field_call_nonfunction_field_lox ... ok
+test run_file_test_tests_integration_field_get_and_set_method_lox ... ok
+test run_file_test_tests_integration_field_get_on_function_lox ... ok
+test run_file_test_tests_integration_field_get_on_bool_lox ... ok
+test run_file_test_tests_integration_field_get_on_class_lox ... ok
+test run_file_test_tests_integration_field_get_on_num_lox ... ok
+test run_file_test_tests_integration_field_get_on_nil_lox ... ok
+test run_file_test_tests_integration_field_get_on_string_lox ... ok
+test run_file_test_tests_integration_field_method_binds_this_lox ... FAILED
+test run_file_test_tests_integration_field_method_lox ... ok
+test run_file_test_tests_integration_field_on_instance_lox ... ok
+test run_file_test_tests_integration_field_set_evaluation_order_lox ... FAILED
+test run_file_test_tests_integration_field_many_lox ... ok
+test run_file_test_tests_integration_field_set_on_bool_lox ... ok
+test run_file_test_tests_integration_field_set_on_class_lox ... ok
+test run_file_test_tests_integration_field_set_on_function_lox ... ok
+test run_file_test_tests_integration_for_class_in_body_lox ... ok
+test run_file_test_tests_integration_field_set_on_nil_lox ... ok
+test run_file_test_tests_integration_field_set_on_string_lox ... ok
+test run_file_test_tests_integration_field_undefined_lox ... ok
+test run_file_test_tests_integration_field_set_on_num_lox ... ok
+test run_file_test_tests_integration_for_closure_in_body_lox ... FAILED
+test run_file_test_tests_integration_for_fun_in_body_lox ... ok
+test run_file_test_tests_integration_for_return_closure_lox ... ok
+test run_file_test_tests_integration_for_scope_lox ... ok
+test run_file_test_tests_integration_for_statement_increment_lox ... ok
+test run_file_test_tests_integration_for_statement_initializer_lox ... ok
+test run_file_test_tests_integration_for_return_inside_lox ... ok
+test run_file_test_tests_integration_for_syntax_lox ... ok
+test run_file_test_tests_integration_for_statement_condition_lox ... ok
+test run_file_test_tests_integration_for_var_in_body_lox ... ok
+test run_file_test_tests_integration_function_body_must_be_block_lox ... ok
+test run_file_test_tests_integration_function_empty_body_lox ... ok
+test run_file_test_tests_integration_function_extra_arguments_lox ... ok
+test run_file_test_tests_integration_function_local_mutual_recursion_lox ... ok
+test run_file_test_tests_integration_function_local_recursion_lox ... ok
+test run_file_test_tests_integration_function_missing_arguments_lox ... ok
+test run_file_test_tests_integration_function_missing_comma_in_parameters_lox ... ok
+test run_file_test_tests_integration_function_nested_call_with_arguments_lox ... ok
+test run_file_test_tests_integration_function_mutual_recursion_lox ... ok
+test run_file_test_tests_integration_function_parameters_lox ... FAILED
+test run_file_test_tests_integration_function_print_lox ... ok
+test run_file_test_tests_integration_function_recursion_lox ... ok
+test run_file_test_tests_integration_if_class_in_else_lox ... ok
+test run_file_test_tests_integration_function_too_many_arguments_lox ... FAILED
+test run_file_test_tests_integration_function_too_many_parameters_lox ... FAILED
+test run_file_test_tests_integration_if_class_in_then_lox ... ok
+test run_file_test_tests_integration_if_dangling_else_lox ... ok
+test run_file_test_tests_integration_if_else_lox ... ok
+test run_file_test_tests_integration_if_fun_in_then_lox ... ok
+test run_file_test_tests_integration_if_fun_in_else_lox ... ok
+test run_file_test_tests_integration_inheritance_constructor_lox ... ok
+test run_file_test_tests_integration_if_if_lox ... ok
+test run_file_test_tests_integration_if_var_in_then_lox ... ok
+test run_file_test_tests_integration_if_truth_lox ... ok
+test run_file_test_tests_integration_if_var_in_else_lox ... ok
+test run_file_test_tests_integration_inheritance_inherit_methods_lox ... ok
+test run_file_test_tests_integration_inheritance_inherit_from_nil_lox ... ok
+test run_file_test_tests_integration_inheritance_inherit_from_function_lox ... ok
+test run_file_test_tests_integration_inheritance_inherit_from_number_lox ... ok
+test run_file_test_tests_integration_inheritance_parenthesized_superclass_lox ... ok
+test run_file_test_tests_integration_limit_no_reuse_constants_lox ... FAILED
+test run_file_test_tests_integration_inheritance_set_fields_from_base_class_lox ... FAILED
+test run_file_test_tests_integration_limit_stack_overflow_lox ... FAILED
+test run_file_test_tests_integration_limit_too_many_constants_lox ... FAILED
+test run_file_test_tests_integration_logical_operator_and_lox ... FAILED
+test run_file_test_tests_integration_limit_too_many_locals_lox ... FAILED
+test run_file_test_tests_integration_logical_operator_and_truth_lox ... FAILED
+test run_file_test_tests_integration_limit_too_many_upvalues_lox ... FAILED
+test run_file_test_tests_integration_logical_operator_or_truth_lox ... FAILED
+test run_file_test_tests_integration_logical_operator_or_lox ... FAILED
+test run_file_test_tests_integration_method_empty_block_lox ... ok
+test run_file_test_tests_integration_method_extra_arguments_lox ... ok
+test run_file_test_tests_integration_method_arity_lox ... FAILED
+test run_file_test_tests_integration_method_not_found_lox ... ok
+test run_file_test_tests_integration_method_print_bound_method_lox ... ok
+test run_file_test_tests_integration_method_missing_arguments_lox ... ok
+test run_file_test_tests_integration_method_refer_to_name_lox ... ok
+test run_file_test_tests_integration_method_too_many_arguments_lox ... FAILED
+test run_file_test_tests_integration_nil_literal_lox ... ok
+test run_file_test_tests_integration_method_too_many_parameters_lox ... FAILED
+test run_file_test_tests_integration_number_decimal_point_at_eof_lox ... ok
+test run_file_test_tests_integration_number_leading_dot_lox ... ok
+test run_file_test_tests_integration_number_literals_lox ... ok
+test run_file_test_tests_integration_number_trailing_dot_lox ... ok
+test run_file_test_tests_integration_operator_add_bool_num_lox ... ok
+test run_file_test_tests_integration_number_nan_equality_lox ... ok
+test run_file_test_tests_integration_operator_add_bool_nil_lox ... ok
+test run_file_test_tests_integration_limit_loop_too_large_lox ... ok
+test run_file_test_tests_integration_operator_add_lox ... ok
+test run_file_test_tests_integration_operator_add_bool_string_lox ... ok
+test run_file_test_tests_integration_operator_add_nil_nil_lox ... ok
+test run_file_test_tests_integration_operator_add_num_nil_lox ... ok
+test run_file_test_tests_integration_operator_add_string_nil_lox ... ok
+test run_file_test_tests_integration_operator_divide_lox ... ok
+test run_file_test_tests_integration_operator_comparison_lox ... ok
+test run_file_test_tests_integration_operator_divide_num_nonnum_lox ... ok
+test run_file_test_tests_integration_operator_divide_nonnum_num_lox ... ok
+test run_file_test_tests_integration_operator_equals_method_lox ... FAILED
+test run_file_test_tests_integration_operator_equals_class_lox ... FAILED
+test run_file_test_tests_integration_operator_equals_lox ... ok
+test run_file_test_tests_integration_operator_greater_num_nonnum_lox ... ok
+test run_file_test_tests_integration_operator_greater_or_equal_nonnum_num_lox ... ok
+test run_file_test_tests_integration_operator_greater_nonnum_num_lox ... ok
+test run_file_test_tests_integration_operator_greater_or_equal_num_nonnum_lox ... ok
+test run_file_test_tests_integration_operator_less_nonnum_num_lox ... ok
+test run_file_test_tests_integration_operator_multiply_lox ... ok
+test run_file_test_tests_integration_operator_less_or_equal_nonnum_num_lox ... ok
+test run_file_test_tests_integration_operator_less_num_nonnum_lox ... ok
+test run_file_test_tests_integration_operator_less_or_equal_num_nonnum_lox ... ok
+test run_file_test_tests_integration_operator_multiply_nonnum_num_lox ... ok
+test run_file_test_tests_integration_operator_multiply_num_nonnum_lox ... ok
+test run_file_test_tests_integration_operator_negate_lox ... ok
+test run_file_test_tests_integration_operator_negate_nonnum_lox ... ok
+test run_file_test_tests_integration_operator_not_lox ... ok
+test run_file_test_tests_integration_operator_subtract_lox ... ok
+test run_file_test_tests_integration_operator_not_class_lox ... ok
+test run_file_test_tests_integration_operator_not_equals_lox ... ok
+test run_file_test_tests_integration_operator_subtract_nonnum_num_lox ... ok
+test run_file_test_tests_integration_operator_subtract_num_nonnum_lox ... ok
+test run_file_test_tests_integration_print_missing_argument_lox ... ok
+test run_file_test_tests_integration_regression_394_lox ... ok
+test run_file_test_tests_integration_regression_40_lox ... ok
+test run_file_test_tests_integration_return_after_else_lox ... ok
+test run_file_test_tests_integration_return_after_if_lox ... ok
+test run_file_test_tests_integration_return_after_while_lox ... ok
+test run_file_test_tests_integration_return_in_function_lox ... ok
+test run_file_test_tests_integration_return_at_top_level_lox ... ok
+test run_file_test_tests_integration_return_in_method_lox ... ok
+test run_file_test_tests_integration_return_return_nil_if_no_value_lox ... ok
+test run_file_test_tests_integration_string_error_after_multiline_lox ... ok
+test run_file_test_tests_integration_string_literals_lox ... ok
+test run_file_test_tests_integration_string_multiline_lox ... ok
+test run_file_test_tests_integration_string_unterminated_lox ... ok
+test run_file_test_tests_integration_super_call_other_method_lox ... ok
+test run_file_test_tests_integration_super_bound_method_lox ... ok
+test run_file_test_tests_integration_super_call_same_method_lox ... ok
+test run_file_test_tests_integration_super_closure_lox ... ok
+test run_file_test_tests_integration_super_constructor_lox ... ok
+test run_file_test_tests_integration_super_extra_arguments_lox ... ok
+test run_file_test_tests_integration_super_indirectly_inherited_lox ... ok
+test run_file_test_tests_integration_super_missing_arguments_lox ... ok
+test run_file_test_tests_integration_super_no_superclass_bind_lox ... ok
+test run_file_test_tests_integration_super_no_superclass_call_lox ... ok
+test run_file_test_tests_integration_super_no_superclass_method_lox ... ok
+test run_file_test_tests_integration_super_parenthesized_lox ... ok
+test run_file_test_tests_integration_super_reassign_superclass_lox ... ok
+test run_file_test_tests_integration_super_super_at_top_level_lox ... ok
+test run_file_test_tests_integration_super_super_in_closure_in_inherited_method_lox ... ok
+test run_file_test_tests_integration_super_super_in_inherited_method_lox ... ok
+test run_file_test_tests_integration_super_super_in_top_level_function_lox ... ok
+test run_file_test_tests_integration_super_super_without_name_lox ... ok
+test run_file_test_tests_integration_super_super_without_dot_lox ... ok
+test run_file_test_tests_integration_super_this_in_superclass_method_lox ... ok
+test run_file_test_tests_integration_this_closure_lox ... ok
+test run_file_test_tests_integration_this_nested_class_lox ... ok
+test run_file_test_tests_integration_this_nested_closure_lox ... ok
+test run_file_test_tests_integration_this_this_at_top_level_lox ... ok
+test run_file_test_tests_integration_this_this_in_method_lox ... ok
+test run_file_test_tests_integration_this_this_in_top_level_function_lox ... ok
+test run_file_test_tests_integration_variable_collide_with_parameter_lox ... FAILED
+test run_file_test_tests_integration_variable_duplicate_local_lox ... FAILED
+test run_file_test_tests_integration_variable_duplicate_parameter_lox ... FAILED
+test run_file_test_tests_integration_variable_early_bound_lox ... ok
+test run_file_test_tests_integration_variable_in_middle_of_block_lox ... ok
+test run_file_test_tests_integration_variable_in_nested_block_lox ... ok
+test run_file_test_tests_integration_variable_local_from_method_lox ... ok
+test run_file_test_tests_integration_variable_redefine_global_lox ... ok
+test run_file_test_tests_integration_variable_redeclare_global_lox ... ok
+test run_file_test_tests_integration_variable_scope_reuse_in_different_blocks_lox ... ok
+test run_file_test_tests_integration_variable_shadow_and_local_lox ... ok
+test run_file_test_tests_integration_variable_shadow_global_lox ... ok
+test run_file_test_tests_integration_variable_shadow_local_lox ... ok
+test run_file_test_tests_integration_variable_undefined_local_lox ... ok
+test run_file_test_tests_integration_variable_uninitialized_lox ... ok
+test run_file_test_tests_integration_variable_undefined_global_lox ... ok
+test run_file_test_tests_integration_variable_use_false_as_var_lox ... ok
+test run_file_test_tests_integration_variable_use_nil_as_var_lox ... ok
+test run_file_test_tests_integration_variable_use_global_in_initializer_lox ... ok
+test run_file_test_tests_integration_variable_use_local_in_initializer_lox ... ok
+test run_file_test_tests_integration_variable_unreached_undefined_lox ... ok
+test run_file_test_tests_integration_while_class_in_body_lox ... ok
+test run_file_test_tests_integration_variable_use_this_as_var_lox ... ok
+test run_file_test_tests_integration_while_closure_in_body_lox ... FAILED
+test run_file_test_tests_integration_while_fun_in_body_lox ... ok
+test run_file_test_tests_integration_while_return_closure_lox ... ok
+test run_file_test_tests_integration_while_var_in_body_lox ... ok
+test run_file_test_tests_integration_while_syntax_lox ... ok
+test run_file_test_tests_integration_while_return_inside_lox ... ok
+
+failures:
+
+---- run_file_test_tests_integration_closure_nested_closure_lox stdout ----
+/home/ultraman/workspace/lox/tests/integration/closure/nested_closure.lox
+
+thread 'run_file_test_tests_integration_closure_nested_closure_lox' panicked at tests/integration.rs:104:25:
+Program exited with failure, expected success
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- run_file_test_tests_integration_constructor_call_init_explicitly_lox stdout ----
+/home/ultraman/workspace/lox/tests/integration/constructor/call_init_explicitly.lox
+
+thread 'run_file_test_tests_integration_constructor_call_init_explicitly_lox' panicked at tests/integration.rs:104:25:
+Program exited with failure, expected success
+
+---- run_file_test_tests_integration_field_method_binds_this_lox stdout ----
+/home/ultraman/workspace/lox/tests/integration/field/method_binds_this.lox
+
+thread 'run_file_test_tests_integration_field_method_binds_this_lox' panicked at tests/integration.rs:104:25:
+Program exited with failure, expected success
+
+---- run_file_test_tests_integration_field_set_evaluation_order_lox stdout ----
+/home/ultraman/workspace/lox/tests/integration/field/set_evaluation_order.lox
+
+thread 'run_file_test_tests_integration_field_set_evaluation_order_lox' panicked at tests/integration.rs:108:26:
+assertion `left == right` failed: Runtime errors should have error code 70
+  left: 65
+ right: 70
+
+---- run_file_test_tests_integration_for_closure_in_body_lox stdout ----
+/home/ultraman/workspace/lox/tests/integration/for/closure_in_body.lox
+
+thread 'run_file_test_tests_integration_for_closure_in_body_lox' panicked at tests/integration.rs:104:25:
+Program exited with failure, expected success
+
+---- run_file_test_tests_integration_function_parameters_lox stdout ----
+/home/ultraman/workspace/lox/tests/integration/function/parameters.lox
+
+thread 'run_file_test_tests_integration_function_parameters_lox' panicked at tests/integration.rs:104:25:
+Program exited with failure, expected success
+
+---- run_file_test_tests_integration_function_too_many_arguments_lox stdout ----
+/home/ultraman/workspace/lox/tests/integration/function/too_many_arguments.lox
+
+thread 'run_file_test_tests_integration_function_too_many_arguments_lox' panicked at tests/integration.rs:113:26:
+assertion `left == right` failed: Compile errors should have error code 65
+  left: 101
+ right: 65
+
+---- run_file_test_tests_integration_function_too_many_parameters_lox stdout ----
+/home/ultraman/workspace/lox/tests/integration/function/too_many_parameters.lox
+
+thread 'run_file_test_tests_integration_function_too_many_parameters_lox' panicked at tests/integration.rs:136:9:
+assertion `left == right` failed: Compile error should match
+  left: ["[line 257] Error at 'a': Can't have more than 255 parameters."]
+ right: ["[line 3] Error at '1': Expect ')' after parameters.", "[line 258] Error at end: Expect '}' after block."]
+
+---- run_file_test_tests_integration_limit_no_reuse_constants_lox stdout ----
+/home/ultraman/workspace/lox/tests/integration/limit/no_reuse_constants.lox
+
+thread 'run_file_test_tests_integration_limit_no_reuse_constants_lox' panicked at tests/integration.rs:113:26:
+assertion `left == right` failed: Compile errors should have error code 65
+  left: 0
+ right: 65
+
+---- run_file_test_tests_integration_inheritance_set_fields_from_base_class_lox stdout ----
+/home/ultraman/workspace/lox/tests/integration/inheritance/set_fields_from_base_class.lox
+
+thread 'run_file_test_tests_integration_inheritance_set_fields_from_base_class_lox' panicked at tests/integration.rs:104:25:
+Program exited with failure, expected success
+
+---- run_file_test_tests_integration_limit_stack_overflow_lox stdout ----
+/home/ultraman/workspace/lox/tests/integration/limit/stack_overflow.lox
+
+thread 'run_file_test_tests_integration_limit_stack_overflow_lox' panicked at tests/integration.rs:108:26:
+assertion `left == right` failed: Runtime errors should have error code 70
+  left: 65
+ right: 70
+
+---- run_file_test_tests_integration_limit_too_many_constants_lox stdout ----
+/home/ultraman/workspace/lox/tests/integration/limit/too_many_constants.lox
+
+thread 'run_file_test_tests_integration_limit_too_many_constants_lox' panicked at tests/integration.rs:113:26:
+assertion `left == right` failed: Compile errors should have error code 65
+  left: 0
+ right: 65
+
+---- run_file_test_tests_integration_logical_operator_and_lox stdout ----
+/home/ultraman/workspace/lox/tests/integration/logical_operator/and.lox
+
+thread 'run_file_test_tests_integration_logical_operator_and_lox' panicked at tests/integration.rs:104:25:
+Program exited with failure, expected success
+
+---- run_file_test_tests_integration_limit_too_many_locals_lox stdout ----
+/home/ultraman/workspace/lox/tests/integration/limit/too_many_locals.lox
+
+thread 'run_file_test_tests_integration_limit_too_many_locals_lox' panicked at tests/integration.rs:136:9:
+assertion `left == right` failed: Compile error should match
+  left: ["[line 52] Error at 'oops': Too many local variables in function."]
+ right: ["[line 4] Error at '01': Expect ';' after variable declaration.", "[line 4] Error at 'v': Already a variable with this name in this scope.", "[line 4] Error at 'v': Already a variable with this name in this scope.", "[line 4] Error at 'v': Already a variable with this name in this scope.", "[line 4] Error at 'v': Already a variable with this name in this scope.", "[line 4] Error at 'v': Already a variable with this name in this scope.", "[line 4] Error at 'v': Already a variable with this name in this scope.", "[line 5] Error at 'v': Already a variable with this name in this scope.", "[line 5] Error at 'v': Already a variable with this name in this scope.", "[line 5] Error at 'v': Already a variable with this name in this scope.", "[line 5] Error at 'v': Already a variable with this name in this scope.", "[line 5] Error at 'v': Already a variable with this name in this scope.", "[line 5] Error at 'v': Already a variable with this name in this scope.", "[line 5] Error at 'v': Already a variable with this name in this scope.", "[line 5] Error at 'v': Already a variable with this name in this scope.", "[line 7] Error at 'v': Already a variable with this name in this scope.", "[line 7] Error at 'v': Already a variable with this name in this scope.", "[line 7] Error at 'v': Already a variable with this name in this scope.", "[line 7] Error at 'v': Already a variable with this name in this scope.", "[line 7] Error at 'v': Already a variable with this name in this scope.", "[line 7] Error at 'v': Already a variable with this name in this scope.", "[line 7] Error at 'v': Already a variable with this name in this scope.", "[line 7] Error at 'v': Already a variable with this name in this scope.", "[line 8] Error at 'v': Already a variable with this name in this scope.", "[line 8] Error at 'v': Already a variable with this name in this scope.", "[line 8] Error at 'v': Already a variable with this name in this scope.", "[line 8] Error at 'v': Already a variable with this name in this scope.", "[line 8] Error at 'v': Already a variable with this name in this scope.", "[line 8] Error at 'v': Already a variable with this name in this scope.", "[line 8] Error at 'v': Already a variable with this name in this scope.", "[line 8] Error at 'v': Already a variable with this name in this scope.", "[line 10] Error at 'v': Already a variable with this name in this scope.", "[line 10] Error at 'v': Already a variable with this name in this scope.", "[line 10] Error at 'v': Already a variable with this name in this scope.", "[line 10] Error at 'v': Already a variable with this name in this scope.", "[line 10] Error at 'v': Already a variable with this name in this scope.", "[line 10] Error at 'v': Already a variable with this name in this scope.", "[line 10] Error at 'v': Already a variable with this name in this scope.", "[line 10] Error at 'v': Already a variable with this name in this scope.", "[line 11] Error at 'v': Already a variable with this name in this scope.", "[line 11] Error at 'v': Already a variable with this name in this scope.", "[line 11] Error at 'v': Already a variable with this name in this scope.", "[line 11] Error at 'v': Already a variable with this name in this scope.", "[line 11] Error at 'v': Already a variable with this name in this scope.", "[line 11] Error at 'v': Already a variable with this name in this scope.", "[line 11] Error at 'v': Already a variable with this name in this scope.", "[line 11] Error at 'v': Already a variable with this name in this scope.", "[line 13] Error at 'v': Already a variable with this name in this scope.", "[line 13] Error at 'v': Already a variable with this name in this scope.", "[line 13] Error at 'v': Already a variable with this name in this scope.", "[line 13] Error at 'v': Already a variable with this name in this scope.", "[line 13] Error at 'v': Already a variable with this name in this scope.", "[line 13] Error at 'v': Already a variable with this name in this scope.", "[line 13] Error at 'v': Already a variable with this name in this scope.", "[line 13] Error at 'v': Already a variable with this name in this scope.", "[line 14] Error at 'v': Already a variable with this name in this scope.", "[line 14] Error at 'v': Already a variable with this name in this scope.", "[line 14] Error at 'v': Already a variable with this name in this scope.", "[line 14] Error at 'v': Already a variable with this name in this scope.", "[line 14] Error at 'v': Already a variable with this name in this scope.", "[line 14] Error at 'v': Already a variable with this name in this scope.", "[line 14] Error at 'v': Already a variable with this name in this scope.", "[line 14] Error at 'v': Already a variable with this name in this scope.", "[line 16] Error at 'v': Already a variable with this name in this scope.", "[line 16] Error at 'v': Already a variable with this name in this scope.", "[line 16] Error at 'v': Already a variable with this name in this scope.", "[line 16] Error at 'v': Already a variable with this name in this scope.", "[line 16] Error at 'v': Already a variable with this name in this scope.", "[line 16] Error at 'v': Already a variable with this name in this scope.", "[line 16] Error at 'v': Already a variable with this name in this scope.", "[line 16] Error at 'v': Already a variable with this name in this scope.", "[line 17] Error at 'v': Already a variable with this name in this scope.", "[line 17] Error at 'v': Already a variable with this name in this scope.", "[line 17] Error at 'v': Already a variable with this name in this scope.", "[line 17] Error at 'v': Already a variable with this name in this scope.", "[line 17] Error at 'v': Already a variable with this name in this scope.", "[line 17] Error at 'v': Already a variable with this name in this scope.", "[line 17] Error at 'v': Already a variable with this name in this scope.", "[line 17] Error at 'v': Already a variable with this name in this scope.", "[line 19] Error at 'v': Already a variable with this name in this scope.", "[line 19] Error at 'v': Already a variable with this name in this scope.", "[line 19] Error at 'v': Already a variable with this name in this scope.", "[line 19] Error at 'v': Already a variable with this name in this scope.", "[line 19] Error at 'v': Already a variable with this name in this scope.", "[line 19] Error at 'v': Already a variable with this name in this scope.", "[line 19] Error at 'v': Already a variable with this name in this scope.", "[line 19] Error at 'v': Already a variable with this name in this scope.", "[line 20] Error at 'v': Already a variable with this name in this scope.", "[line 20] Error at 'v': Already a variable with this name in this scope.", "[line 20] Error at 'v': Already a variable with this name in this scope.", "[line 20] Error at 'v': Already a variable with this name in this scope.", "[line 20] Error at 'v': Already a variable with this name in this scope.", "[line 20] Error at 'v': Already a variable with this name in this scope.", "[line 20] Error at 'v': Already a variable with this name in this scope.", "[line 20] Error at 'v': Already a variable with this name in this scope.", "[line 22] Error at 'v': Already a variable with this name in this scope.", "[line 22] Error at 'v': Already a variable with this name in this scope.", "[line 22] Error at 'v': Already a variable with this name in this scope.", "[line 22] Error at 'v': Already a variable with this name in this scope.", "[line 22] Error at 'v': Already a variable with this name in this scope.", "[line 22] Error at 'v': Already a variable with this name in this scope.", "[line 22] Error at 'v': Already a variable with this name in this scope.", "[line 22] Error at 'v': Already a variable with this name in this scope.", "[line 23] Error at 'v': Already a variable with this name in this scope.", "[line 23] Error at 'v': Already a variable with this name in this scope.", "[line 23] Error at 'v': Already a variable with this name in this scope.", "[line 23] Error at 'v': Already a variable with this name in this scope.", "[line 23] Error at 'v': Already a variable with this name in this scope.", "[line 23] Error at 'v': Already a variable with this name in this scope.", "[line 23] Error at 'v': Already a variable with this name in this scope.", "[line 23] Error at 'v': Already a variable with this name in this scope.", "[line 25] Error at 'v': Already a variable with this name in this scope.", "[line 25] Error at 'v': Already a variable with this name in this scope.", "[line 25] Error at 'v': Already a variable with this name in this scope.", "[line 25] Error at 'v': Already a variable with this name in this scope.", "[line 25] Error at 'v': Already a variable with this name in this scope.", "[line 25] Error at 'v': Already a variable with this name in this scope.", "[line 25] Error at 'v': Already a variable with this name in this scope.", "[line 25] Error at 'v': Already a variable with this name in this scope.", "[line 26] Error at 'v': Already a variable with this name in this scope.", "[line 26] Error at 'v': Already a variable with this name in this scope.", "[line 26] Error at 'v': Already a variable with this name in this scope.", "[line 26] Error at 'v': Already a variable with this name in this scope.", "[line 26] Error at 'v': Already a variable with this name in this scope.", "[line 26] Error at 'v': Already a variable with this name in this scope.", "[line 26] Error at 'v': Already a variable with this name in this scope.", "[line 26] Error at 'v': Already a variable with this name in this scope.", "[line 28] Error at 'v': Already a variable with this name in this scope.", "[line 28] Error at 'v': Already a variable with this name in this scope.", "[line 28] Error at 'v': Already a variable with this name in this scope.", "[line 28] Error at 'v': Already a variable with this name in this scope.", "[line 28] Error at 'v': Already a variable with this name in this scope.", "[line 28] Error at 'v': Already a variable with this name in this scope.", "[line 28] Error at 'v': Already a variable with this name in this scope.", "[line 28] Error at 'v': Already a variable with this name in this scope.", "[line 29] Error at 'v': Already a variable with this name in this scope.", "[line 29] Error at 'v': Already a variable with this name in this scope.", "[line 29] Error at 'v': Already a variable with this name in this scope.", "[line 29] Error at 'v': Already a variable with this name in this scope.", "[line 29] Error at 'v': Already a variable with this name in this scope.", "[line 29] Error at 'v': Already a variable with this name in this scope.", "[line 29] Error at 'v': Already a variable with this name in this scope.", "[line 29] Error at 'v': Already a variable with this name in this scope.", "[line 31] Error at 'v': Already a variable with this name in this scope.", "[line 31] Error at 'v': Already a variable with this name in this scope.", "[line 31] Error at 'v': Already a variable with this name in this scope.", "[line 31] Error at 'v': Already a variable with this name in this scope.", "[line 31] Error at 'v': Already a variable with this name in this scope.", "[line 31] Error at 'v': Already a variable with this name in this scope.", "[line 31] Error at 'v': Already a variable with this name in this scope.", "[line 31] Error at 'v': Already a variable with this name in this scope.", "[line 32] Error at 'v': Already a variable with this name in this scope.", "[line 32] Error at 'v': Already a variable with this name in this scope.", "[line 32] Error at 'v': Already a variable with this name in this scope.", "[line 32] Error at 'v': Already a variable with this name in this scope.", "[line 32] Error at 'v': Already a variable with this name in this scope.", "[line 32] Error at 'v': Already a variable with this name in this scope.", "[line 32] Error at 'v': Already a variable with this name in this scope.", "[line 32] Error at 'v': Already a variable with this name in this scope.", "[line 34] Error at '0': Expect ';' after variable declaration.", "[line 34] Error at 'va': Already a variable with this name in this scope.", "[line 34] Error at 'va': Already a variable with this name in this scope.", "[line 34] Error at 'va': Already a variable with this name in this scope.", "[line 34] Error at 'va': Already a variable with this name in this scope.", "[line 34] Error at 'va': Already a variable with this name in this scope.", "[line 34] Error at 'va': Already a variable with this name in this scope.", "[line 34] Error at 'va': Already a variable with this name in this scope.", "[line 35] Error at 'va': Already a variable with this name in this scope.", "[line 35] Error at 'va': Already a variable with this name in this scope.", "[line 37] Error at '0': Expect ';' after variable declaration.", "[line 37] Error at 'vb': Already a variable with this name in this scope.", "[line 37] Error at 'vb': Already a variable with this name in this scope.", "[line 37] Error at 'vb': Already a variable with this name in this scope.", "[line 37] Error at 'vb': Already a variable with this name in this scope.", "[line 37] Error at 'vb': Already a variable with this name in this scope.", "[line 37] Error at 'vb': Already a variable with this name in this scope.", "[line 37] Error at 'vb': Already a variable with this name in this scope.", "[line 38] Error at 'vb': Already a variable with this name in this scope.", "[line 38] Error at 'vb': Already a variable with this name in this scope.", "[line 40] Error at '0': Expect ';' after variable declaration.", "[line 40] Error at 'vc': Already a variable with this name in this scope.", "[line 40] Error at 'vc': Already a variable with this name in this scope.", "[line 40] Error at 'vc': Already a variable with this name in this scope.", "[line 40] Error at 'vc': Already a variable with this name in this scope.", "[line 40] Error at 'vc': Already a variable with this name in this scope.", "[line 40] Error at 'vc': Already a variable with this name in this scope.", "[line 40] Error at 'vc': Already a variable with this name in this scope.", "[line 41] Error at 'vc': Already a variable with this name in this scope.", "[line 41] Error at 'vc': Already a variable with this name in this scope.", "[line 43] Error at '0': Expect ';' after variable declaration.", "[line 43] Error at 'vd': Already a variable with this name in this scope.", "[line 43] Error at 'vd': Already a variable with this name in this scope.", "[line 43] Error at 'vd': Already a variable with this name in this scope.", "[line 43] Error at 'vd': Already a variable with this name in this scope.", "[line 43] Error at 'vd': Already a variable with this name in this scope.", "[line 43] Error at 'vd': Already a variable with this name in this scope.", "[line 43] Error at 'vd': Already a variable with this name in this scope.", "[line 44] Error at 'vd': Already a variable with this name in this scope.", "[line 44] Error at 'vd': Already a variable with this name in this scope.", "[line 46] Error at '0': Expect ';' after variable declaration.", "[line 46] Error at 've': Already a variable with this name in this scope.", "[line 46] Error at 've': Already a variable with this name in this scope.", "[line 46] Error at 've': Already a variable with this name in this scope.", "[line 46] Error at 've': Already a variable with this name in this scope.", "[line 46] Error at 've': Already a variable with this name in this scope.", "[line 46] Error at 've': Already a variable with this name in this scope.", "[line 46] Error at 've': Already a variable with this name in this scope.", "[line 47] Error at 've': Already a variable with this name in this scope.", "[line 47] Error at 've': Already a variable with this name in this scope.", "[line 49] Error at '0': Expect ';' after variable declaration.", "[line 49] Error at 'vf': Already a variable with this name in this scope.", "[line 49] Error at 'vf': Already a variable with this name in this scope.", "[line 49] Error at 'vf': Already a variable with this name in this scope.", "[line 49] Error at 'vf': Already a variable with this name in this scope.", "[line 49] Error at 'vf': Already a variable with this name in this scope.", "[line 49] Error at 'vf': Already a variable with this name in this scope.", "[line 49] Error at 'vf': Already a variable with this name in this scope.", "[line 50] Error at 'vf': Already a variable with this name in this scope.", "[line 50] Error at 'vf': Already a variable with this name in this scope.", "[line 52] Error at 'oops': Too many local variables in function."]
+
+---- run_file_test_tests_integration_logical_operator_and_truth_lox stdout ----
+/home/ultraman/workspace/lox/tests/integration/logical_operator/and_truth.lox
+
+thread 'run_file_test_tests_integration_logical_operator_and_truth_lox' panicked at tests/integration.rs:104:25:
+Program exited with failure, expected success
+
+---- run_file_test_tests_integration_limit_too_many_upvalues_lox stdout ----
+/home/ultraman/workspace/lox/tests/integration/limit/too_many_upvalues.lox
+
+thread 'run_file_test_tests_integration_limit_too_many_upvalues_lox' panicked at tests/integration.rs:136:9:
+assertion `left == right` failed: Compile error should match
+  left: ["[line 102] Error at 'oops': Too many closure variables in function."]
+ right: ["[line 2] Error at '00': Expect ';' after variable declaration.", "[line 2] Error at 'v': Already a variable with this name in this scope.", "[line 2] Error at 'v': Already a variable with this name in this scope.", "[line 2] Error at 'v': Already a variable with this name in this scope.", "[line 2] Error at 'v': Already a variable with this name in this scope.", "[line 2] Error at 'v': Already a variable with this name in this scope.", "[line 2] Error at 'v': Already a variable with this name in this scope.", "[line 2] Error at 'v': Already a variable with this name in this scope.", "[line 3] Error at 'v': Already a variable with this name in this scope.", "[line 3] Error at 'v': Already a variable with this name in this scope.", "[line 3] Error at 'v': Already a variable with this name in this scope.", "[line 3] Error at 'v': Already a variable with this name in this scope.", "[line 3] Error at 'v': Already a variable with this name in this scope.", "[line 3] Error at 'v': Already a variable with this name in this scope.", "[line 3] Error at 'v': Already a variable with this name in this scope.", "[line 3] Error at 'v': Already a variable with this name in this scope.", "[line 5] Error at 'v': Already a variable with this name in this scope.", "[line 5] Error at 'v': Already a variable with this name in this scope.", "[line 5] Error at 'v': Already a variable with this name in this scope.", "[line 5] Error at 'v': Already a variable with this name in this scope.", "[line 5] Error at 'v': Already a variable with this name in this scope.", "[line 5] Error at 'v': Already a variable with this name in this scope.", "[line 5] Error at 'v': Already a variable with this name in this scope.", "[line 5] Error at 'v': Already a variable with this name in this scope.", "[line 6] Error at 'v': Already a variable with this name in this scope.", "[line 6] Error at 'v': Already a variable with this name in this scope.", "[line 6] Error at 'v': Already a variable with this name in this scope.", "[line 6] Error at 'v': Already a variable with this name in this scope.", "[line 6] Error at 'v': Already a variable with this name in this scope.", "[line 6] Error at 'v': Already a variable with this name in this scope.", "[line 6] Error at 'v': Already a variable with this name in this scope.", "[line 6] Error at 'v': Already a variable with this name in this scope.", "[line 8] Error at 'v': Already a variable with this name in this scope.", "[line 8] Error at 'v': Already a variable with this name in this scope.", "[line 8] Error at 'v': Already a variable with this name in this scope.", "[line 8] Error at 'v': Already a variable with this name in this scope.", "[line 8] Error at 'v': Already a variable with this name in this scope.", "[line 8] Error at 'v': Already a variable with this name in this scope.", "[line 8] Error at 'v': Already a variable with this name in this scope.", "[line 8] Error at 'v': Already a variable with this name in this scope.", "[line 9] Error at 'v': Already a variable with this name in this scope.", "[line 9] Error at 'v': Already a variable with this name in this scope.", "[line 9] Error at 'v': Already a variable with this name in this scope.", "[line 9] Error at 'v': Already a variable with this name in this scope.", "[line 9] Error at 'v': Already a variable with this name in this scope.", "[line 9] Error at 'v': Already a variable with this name in this scope.", "[line 9] Error at 'v': Already a variable with this name in this scope.", "[line 9] Error at 'v': Already a variable with this name in this scope.", "[line 11] Error at 'v': Already a variable with this name in this scope.", "[line 11] Error at 'v': Already a variable with this name in this scope.", "[line 11] Error at 'v': Already a variable with this name in this scope.", "[line 11] Error at 'v': Already a variable with this name in this scope.", "[line 11] Error at 'v': Already a variable with this name in this scope.", "[line 11] Error at 'v': Already a variable with this name in this scope.", "[line 11] Error at 'v': Already a variable with this name in this scope.", "[line 11] Error at 'v': Already a variable with this name in this scope.", "[line 12] Error at 'v': Already a variable with this name in this scope.", "[line 12] Error at 'v': Already a variable with this name in this scope.", "[line 12] Error at 'v': Already a variable with this name in this scope.", "[line 12] Error at 'v': Already a variable with this name in this scope.", "[line 12] Error at 'v': Already a variable with this name in this scope.", "[line 12] Error at 'v': Already a variable with this name in this scope.", "[line 12] Error at 'v': Already a variable with this name in this scope.", "[line 12] Error at 'v': Already a variable with this name in this scope.", "[line 14] Error at 'v': Already a variable with this name in this scope.", "[line 14] Error at 'v': Already a variable with this name in this scope.", "[line 14] Error at 'v': Already a variable with this name in this scope.", "[line 14] Error at 'v': Already a variable with this name in this scope.", "[line 14] Error at 'v': Already a variable with this name in this scope.", "[line 14] Error at 'v': Already a variable with this name in this scope.", "[line 14] Error at 'v': Already a variable with this name in this scope.", "[line 14] Error at 'v': Already a variable with this name in this scope.", "[line 15] Error at 'v': Already a variable with this name in this scope.", "[line 15] Error at 'v': Already a variable with this name in this scope.", "[line 15] Error at 'v': Already a variable with this name in this scope.", "[line 15] Error at 'v': Already a variable with this name in this scope.", "[line 15] Error at 'v': Already a variable with this name in this scope.", "[line 15] Error at 'v': Already a variable with this name in this scope.", "[line 15] Error at 'v': Already a variable with this name in this scope.", "[line 15] Error at 'v': Already a variable with this name in this scope.", "[line 17] Error at 'v': Already a variable with this name in this scope.", "[line 17] Error at 'v': Already a variable with this name in this scope.", "[line 17] Error at 'v': Already a variable with this name in this scope.", "[line 17] Error at 'v': Already a variable with this name in this scope.", "[line 17] Error at 'v': Already a variable with this name in this scope.", "[line 17] Error at 'v': Already a variable with this name in this scope.", "[line 17] Error at 'v': Already a variable with this name in this scope.", "[line 17] Error at 'v': Already a variable with this name in this scope.", "[line 18] Error at 'v': Already a variable with this name in this scope.", "[line 18] Error at 'v': Already a variable with this name in this scope.", "[line 18] Error at 'v': Already a variable with this name in this scope.", "[line 18] Error at 'v': Already a variable with this name in this scope.", "[line 18] Error at 'v': Already a variable with this name in this scope.", "[line 18] Error at 'v': Already a variable with this name in this scope.", "[line 18] Error at 'v': Already a variable with this name in this scope.", "[line 18] Error at 'v': Already a variable with this name in this scope.", "[line 20] Error at 'v': Already a variable with this name in this scope.", "[line 20] Error at 'v': Already a variable with this name in this scope.", "[line 20] Error at 'v': Already a variable with this name in this scope.", "[line 20] Error at 'v': Already a variable with this name in this scope.", "[line 20] Error at 'v': Already a variable with this name in this scope.", "[line 20] Error at 'v': Already a variable with this name in this scope.", "[line 20] Error at 'v': Already a variable with this name in this scope.", "[line 20] Error at 'v': Already a variable with this name in this scope.", "[line 21] Error at 'v': Already a variable with this name in this scope.", "[line 21] Error at 'v': Already a variable with this name in this scope.", "[line 21] Error at 'v': Already a variable with this name in this scope.", "[line 21] Error at 'v': Already a variable with this name in this scope.", "[line 21] Error at 'v': Already a variable with this name in this scope.", "[line 21] Error at 'v': Already a variable with this name in this scope.", "[line 21] Error at 'v': Already a variable with this name in this scope.", "[line 21] Error at 'v': Already a variable with this name in this scope.", "[line 23] Error at 'v': Already a variable with this name in this scope.", "[line 23] Error at 'v': Already a variable with this name in this scope.", "[line 23] Error at 'v': Already a variable with this name in this scope.", "[line 23] Error at 'v': Already a variable with this name in this scope.", "[line 23] Error at 'v': Already a variable with this name in this scope.", "[line 23] Error at 'v': Already a variable with this name in this scope.", "[line 23] Error at 'v': Already a variable with this name in this scope.", "[line 23] Error at 'v': Already a variable with this name in this scope.", "[line 24] Error at 'v': Already a variable with this name in this scope.", "[line 24] Error at 'v': Already a variable with this name in this scope.", "[line 24] Error at 'v': Already a variable with this name in this scope.", "[line 24] Error at 'v': Already a variable with this name in this scope.", "[line 24] Error at 'v': Already a variable with this name in this scope.", "[line 24] Error at 'v': Already a variable with this name in this scope.", "[line 24] Error at 'v': Already a variable with this name in this scope.", "[line 24] Error at 'v': Already a variable with this name in this scope.", "[line 27] Error at '80': Expect ';' after variable declaration.", "[line 27] Error at 'v': Already a variable with this name in this scope.", "[line 27] Error at 'v': Already a variable with this name in this scope.", "[line 27] Error at 'v': Already a variable with this name in this scope.", "[line 27] Error at 'v': Already a variable with this name in this scope.", "[line 27] Error at 'v': Already a variable with this name in this scope.", "[line 27] Error at 'v': Already a variable with this name in this scope.", "[line 27] Error at 'v': Already a variable with this name in this scope.", "[line 28] Error at 'v': Already a variable with this name in this scope.", "[line 28] Error at 'v': Already a variable with this name in this scope.", "[line 28] Error at 'v': Already a variable with this name in this scope.", "[line 28] Error at 'v': Already a variable with this name in this scope.", "[line 28] Error at 'v': Already a variable with this name in this scope.", "[line 28] Error at 'v': Already a variable with this name in this scope.", "[line 28] Error at 'v': Already a variable with this name in this scope.", "[line 28] Error at 'v': Already a variable with this name in this scope.", "[line 30] Error at 'v': Already a variable with this name in this scope.", "[line 30] Error at 'v': Already a variable with this name in this scope.", "[line 30] Error at 'v': Already a variable with this name in this scope.", "[line 30] Error at 'v': Already a variable with this name in this scope.", "[line 30] Error at 'v': Already a variable with this name in this scope.", "[line 30] Error at 'v': Already a variable with this name in this scope.", "[line 30] Error at 'v': Already a variable with this name in this scope.", "[line 30] Error at 'v': Already a variable with this name in this scope.", "[line 31] Error at 'v': Already a variable with this name in this scope.", "[line 31] Error at 'v': Already a variable with this name in this scope.", "[line 31] Error at 'v': Already a variable with this name in this scope.", "[line 31] Error at 'v': Already a variable with this name in this scope.", "[line 31] Error at 'v': Already a variable with this name in this scope.", "[line 31] Error at 'v': Already a variable with this name in this scope.", "[line 31] Error at 'v': Already a variable with this name in this scope.", "[line 31] Error at 'v': Already a variable with this name in this scope.", "[line 33] Error at '0': Expect ';' after variable declaration.", "[line 33] Error at 'va': Already a variable with this name in this scope.", "[line 33] Error at 'va': Already a variable with this name in this scope.", "[line 33] Error at 'va': Already a variable with this name in this scope.", "[line 33] Error at 'va': Already a variable with this name in this scope.", "[line 33] Error at 'va': Already a variable with this name in this scope.", "[line 33] Error at 'va': Already a variable with this name in this scope.", "[line 33] Error at 'va': Already a variable with this name in this scope.", "[line 34] Error at 'va': Already a variable with this name in this scope.", "[line 34] Error at 'va': Already a variable with this name in this scope.", "[line 36] Error at '0': Expect ';' after variable declaration.", "[line 36] Error at 'vb': Already a variable with this name in this scope.", "[line 36] Error at 'vb': Already a variable with this name in this scope.", "[line 36] Error at 'vb': Already a variable with this name in this scope.", "[line 36] Error at 'vb': Already a variable with this name in this scope.", "[line 36] Error at 'vb': Already a variable with this name in this scope.", "[line 36] Error at 'vb': Already a variable with this name in this scope.", "[line 36] Error at 'vb': Already a variable with this name in this scope.", "[line 37] Error at 'vb': Already a variable with this name in this scope.", "[line 37] Error at 'vb': Already a variable with this name in this scope.", "[line 39] Error at '0': Expect ';' after variable declaration.", "[line 39] Error at 'vc': Already a variable with this name in this scope.", "[line 39] Error at 'vc': Already a variable with this name in this scope.", "[line 39] Error at 'vc': Already a variable with this name in this scope.", "[line 39] Error at 'vc': Already a variable with this name in this scope.", "[line 39] Error at 'vc': Already a variable with this name in this scope.", "[line 39] Error at 'vc': Already a variable with this name in this scope.", "[line 39] Error at 'vc': Already a variable with this name in this scope.", "[line 40] Error at 'vc': Already a variable with this name in this scope.", "[line 40] Error at 'vc': Already a variable with this name in this scope.", "[line 42] Error at '0': Expect ';' after variable declaration.", "[line 42] Error at 'vd': Already a variable with this name in this scope.", "[line 42] Error at 'vd': Already a variable with this name in this scope.", "[line 42] Error at 'vd': Already a variable with this name in this scope.", "[line 42] Error at 'vd': Already a variable with this name in this scope.", "[line 42] Error at 'vd': Already a variable with this name in this scope.", "[line 42] Error at 'vd': Already a variable with this name in this scope.", "[line 42] Error at 'vd': Already a variable with this name in this scope.", "[line 43] Error at 'vd': Already a variable with this name in this scope.", "[line 43] Error at 'vd': Already a variable with this name in this scope.", "[line 45] Error at '0': Expect ';' after variable declaration.", "[line 45] Error at 've': Already a variable with this name in this scope.", "[line 45] Error at 've': Already a variable with this name in this scope.", "[line 45] Error at 've': Already a variable with this name in this scope.", "[line 45] Error at 've': Already a variable with this name in this scope.", "[line 45] Error at 've': Already a variable with this name in this scope.", "[line 45] Error at 've': Already a variable with this name in this scope.", "[line 45] Error at 've': Already a variable with this name in this scope.", "[line 46] Error at 've': Already a variable with this name in this scope.", "[line 46] Error at 've': Already a variable with this name in this scope.", "[line 48] Error at '0': Expect ';' after variable declaration.", "[line 48] Error at 'vf': Already a variable with this name in this scope.", "[line 48] Error at 'vf': Already a variable with this name in this scope.", "[line 48] Error at 'vf': Already a variable with this name in this scope.", "[line 48] Error at 'vf': Already a variable with this name in this scope.", "[line 48] Error at 'vf': Already a variable with this name in this scope.", "[line 48] Error at 'vf': Already a variable with this name in this scope.", "[line 48] Error at 'vf': Already a variable with this name in this scope.", "[line 49] Error at 'vf': Already a variable with this name in this scope.", "[line 49] Error at 'vf': Already a variable with this name in this scope.", "[line 54] Error at '00': Expect ';' after expression.", "[line 54] Error at '01': Expect ';' after expression.", "[line 54] Error at '02': Expect ';' after expression.", "[line 54] Error at '03': Expect ';' after expression.", "[line 54] Error at '04': Expect ';' after expression.", "[line 54] Error at '05': Expect ';' after expression.", "[line 54] Error at '06': Expect ';' after expression.", "[line 54] Error at '07': Expect ';' after expression.", "[line 55] Error at '08': Expect ';' after expression.", "[line 55] Error at '09': Expect ';' after expression.", "[line 55] Error at '0': Expect ';' after expression.", "[line 55] Error at '0': Expect ';' after expression.", "[line 55] Error at '0': Expect ';' after expression.", "[line 55] Error at '0': Expect ';' after expression.", "[line 55] Error at '0': Expect ';' after expression.", "[line 55] Error at '0': Expect ';' after expression.", "[line 57] Error at '10': Expect ';' after expression.", "[line 57] Error at '11': Expect ';' after expression.", "[line 57] Error at '12': Expect ';' after expression.", "[line 57] Error at '13': Expect ';' after expression.", "[line 57] Error at '14': Expect ';' after expression.", "[line 57] Error at '15': Expect ';' after expression.", "[line 57] Error at '16': Expect ';' after expression.", "[line 57] Error at '17': Expect ';' after expression.", "[line 58] Error at '18': Expect ';' after expression.", "[line 58] Error at '19': Expect ';' after expression.", "[line 58] Error at '1': Expect ';' after expression.", "[line 58] Error at '1': Expect ';' after expression.", "[line 58] Error at '1': Expect ';' after expression.", "[line 58] Error at '1': Expect ';' after expression.", "[line 58] Error at '1': Expect ';' after expression.", "[line 58] Error at '1': Expect ';' after expression.", "[line 60] Error at '20': Expect ';' after expression.", "[line 60] Error at '21': Expect ';' after expression.", "[line 60] Error at '22': Expect ';' after expression.", "[line 60] Error at '23': Expect ';' after expression.", "[line 60] Error at '24': Expect ';' after expression.", "[line 60] Error at '25': Expect ';' after expression.", "[line 60] Error at '26': Expect ';' after expression.", "[line 60] Error at '27': Expect ';' after expression.", "[line 61] Error at '28': Expect ';' after expression.", "[line 61] Error at '29': Expect ';' after expression.", "[line 61] Error at '2': Expect ';' after expression.", "[line 61] Error at '2': Expect ';' after expression.", "[line 61] Error at '2': Expect ';' after expression.", "[line 61] Error at '2': Expect ';' after expression.", "[line 61] Error at '2': Expect ';' after expression.", "[line 61] Error at '2': Expect ';' after expression.", "[line 63] Error at '30': Expect ';' after expression.", "[line 63] Error at '31': Expect ';' after expression.", "[line 63] Error at '32': Expect ';' after expression.", "[line 63] Error at '33': Expect ';' after expression.", "[line 63] Error at '34': Expect ';' after expression.", "[line 63] Error at '35': Expect ';' after expression.", "[line 63] Error at '36': Expect ';' after expression.", "[line 63] Error at '37': Expect ';' after expression.", "[line 64] Error at '38': Expect ';' after expression.", "[line 64] Error at '39': Expect ';' after expression.", "[line 64] Error at '3': Expect ';' after expression.", "[line 64] Error at '3': Expect ';' after expression.", "[line 64] Error at '3': Expect ';' after expression.", "[line 64] Error at '3': Expect ';' after expression.", "[line 64] Error at '3': Expect ';' after expression.", "[line 64] Error at '3': Expect ';' after expression.", "[line 66] Error at '40': Expect ';' after expression.", "[line 66] Error at '41': Expect ';' after expression.", "[line 66] Error at '42': Expect ';' after expression.", "[line 66] Error at '43': Expect ';' after expression.", "[line 66] Error at '44': Expect ';' after expression.", "[line 66] Error at '45': Expect ';' after expression.", "[line 66] Error at '46': Expect ';' after expression.", "[line 66] Error at '47': Expect ';' after expression.", "[line 67] Error at '48': Expect ';' after expression.", "[line 67] Error at '49': Expect ';' after expression.", "[line 67] Error at '4': Expect ';' after expression.", "[line 67] Error at '4': Expect ';' after expression.", "[line 67] Error at '4': Expect ';' after expression.", "[line 67] Error at '4': Expect ';' after expression.", "[line 67] Error at '4': Expect ';' after expression.", "[line 67] Error at '4': Expect ';' after expression.", "[line 69] Error at '50': Expect ';' after expression.", "[line 69] Error at '51': Expect ';' after expression.", "[line 69] Error at '52': Expect ';' after expression.", "[line 69] Error at '53': Expect ';' after expression.", "[line 69] Error at '54': Expect ';' after expression.", "[line 69] Error at '55': Expect ';' after expression.", "[line 69] Error at '56': Expect ';' after expression.", "[line 69] Error at '57': Expect ';' after expression.", "[line 70] Error at '58': Expect ';' after expression.", "[line 70] Error at '59': Expect ';' after expression.", "[line 70] Error at '5': Expect ';' after expression.", "[line 70] Error at '5': Expect ';' after expression.", "[line 70] Error at '5': Expect ';' after expression.", "[line 70] Error at '5': Expect ';' after expression.", "[line 70] Error at '5': Expect ';' after expression.", "[line 70] Error at '5': Expect ';' after expression.", "[line 72] Error at '60': Expect ';' after expression.", "[line 72] Error at '61': Expect ';' after expression.", "[line 72] Error at '62': Expect ';' after expression.", "[line 72] Error at '63': Expect ';' after expression.", "[line 72] Error at '64': Expect ';' after expression.", "[line 72] Error at '65': Expect ';' after expression.", "[line 72] Error at '66': Expect ';' after expression.", "[line 72] Error at '67': Expect ';' after expression.", "[line 73] Error at '68': Expect ';' after expression.", "[line 73] Error at '69': Expect ';' after expression.", "[line 73] Error at '6': Expect ';' after expression.", "[line 73] Error at '6': Expect ';' after expression.", "[line 73] Error at '6': Expect ';' after expression.", "[line 73] Error at '6': Expect ';' after expression.", "[line 73] Error at '6': Expect ';' after expression.", "[line 73] Error at '6': Expect ';' after expression.", "[line 75] Error at '70': Expect ';' after expression.", "[line 75] Error at '71': Expect ';' after expression.", "[line 75] Error at '72': Expect ';' after expression.", "[line 75] Error at '73': Expect ';' after expression.", "[line 75] Error at '74': Expect ';' after expression.", "[line 75] Error at '75': Expect ';' after expression.", "[line 75] Error at '76': Expect ';' after expression.", "[line 75] Error at '77': Expect ';' after expression.", "[line 76] Error at '78': Expect ';' after expression.", "[line 76] Error at '79': Expect ';' after expression.", "[line 76] Error at '7': Expect ';' after expression.", "[line 76] Error at '7': Expect ';' after expression.", "[line 76] Error at '7': Expect ';' after expression.", "[line 76] Error at '7': Expect ';' after expression.", "[line 76] Error at '7': Expect ';' after expression.", "[line 76] Error at '7': Expect ';' after expression.", "[line 78] Error at '80': Expect ';' after expression.", "[line 78] Error at '81': Expect ';' after expression.", "[line 78] Error at '82': Expect ';' after expression.", "[line 78] Error at '83': Expect ';' after expression.", "[line 78] Error at '84': Expect ';' after expression.", "[line 78] Error at '85': Expect ';' after expression.", "[line 78] Error at '86': Expect ';' after expression.", "[line 78] Error at '87': Expect ';' after expression.", "[line 79] Error at '88': Expect ';' after expression.", "[line 79] Error at '89': Expect ';' after expression.", "[line 79] Error at '8': Expect ';' after expression.", "[line 79] Error at '8': Expect ';' after expression.", "[line 79] Error at '8': Expect ';' after expression.", "[line 79] Error at '8': Expect ';' after expression.", "[line 79] Error at '8': Expect ';' after expression.", "[line 79] Error at '8': Expect ';' after expression.", "[line 81] Error at '90': Expect ';' after expression.", "[line 81] Error at '91': Expect ';' after expression.", "[line 81] Error at '92': Expect ';' after expression.", "[line 81] Error at '93': Expect ';' after expression.", "[line 81] Error at '94': Expect ';' after expression.", "[line 81] Error at '95': Expect ';' after expression.", "[line 81] Error at '96': Expect ';' after expression.", "[line 81] Error at '97': Expect ';' after expression.", "[line 82] Error at '98': Expect ';' after expression.", "[line 82] Error at '99': Expect ';' after expression.", "[line 82] Error at '9': Expect ';' after expression.", "[line 82] Error at '9': Expect ';' after expression.", "[line 82] Error at '9': Expect ';' after expression.", "[line 82] Error at '9': Expect ';' after expression.", "[line 82] Error at '9': Expect ';' after expression.", "[line 82] Error at '9': Expect ';' after expression.", "[line 84] Error at '0': Expect ';' after expression.", "[line 84] Error at '1': Expect ';' after expression.", "[line 84] Error at '2': Expect ';' after expression.", "[line 84] Error at '3': Expect ';' after expression.", "[line 84] Error at '4': Expect ';' after expression.", "[line 84] Error at '5': Expect ';' after expression.", "[line 84] Error at '6': Expect ';' after expression.", "[line 84] Error at '7': Expect ';' after expression.", "[line 85] Error at '8': Expect ';' after expression.", "[line 85] Error at '9': Expect ';' after expression.", "[line 87] Error at '0': Expect ';' after expression.", "[line 87] Error at '1': Expect ';' after expression.", "[line 87] Error at '2': Expect ';' after expression.", "[line 87] Error at '3': Expect ';' after expression.", "[line 87] Error at '4': Expect ';' after expression.", "[line 87] Error at '5': Expect ';' after expression.", "[line 87] Error at '6': Expect ';' after expression.", "[line 87] Error at '7': Expect ';' after expression.", "[line 88] Error at '8': Expect ';' after expression.", "[line 88] Error at '9': Expect ';' after expression.", "[line 90] Error at '0': Expect ';' after expression.", "[line 90] Error at '1': Expect ';' after expression.", "[line 90] Error at '2': Expect ';' after expression.", "[line 90] Error at '3': Expect ';' after expression.", "[line 90] Error at '4': Expect ';' after expression.", "[line 90] Error at '5': Expect ';' after expression.", "[line 90] Error at '6': Expect ';' after expression.", "[line 90] Error at '7': Expect ';' after expression.", "[line 91] Error at '8': Expect ';' after expression.", "[line 91] Error at '9': Expect ';' after expression.", "[line 93] Error at '0': Expect ';' after expression.", "[line 93] Error at '1': Expect ';' after expression.", "[line 93] Error at '2': Expect ';' after expression.", "[line 93] Error at '3': Expect ';' after expression.", "[line 93] Error at '4': Expect ';' after expression.", "[line 93] Error at '5': Expect ';' after expression.", "[line 93] Error at '6': Expect ';' after expression.", "[line 93] Error at '7': Expect ';' after expression.", "[line 94] Error at '8': Expect ';' after expression.", "[line 94] Error at '9': Expect ';' after expression.", "[line 96] Error at '0': Expect ';' after expression.", "[line 96] Error at '1': Expect ';' after expression.", "[line 96] Error at '2': Expect ';' after expression.", "[line 96] Error at '3': Expect ';' after expression.", "[line 96] Error at '4': Expect ';' after expression.", "[line 96] Error at '5': Expect ';' after expression.", "[line 96] Error at '6': Expect ';' after expression.", "[line 96] Error at '7': Expect ';' after expression.", "[line 97] Error at '8': Expect ';' after expression.", "[line 97] Error at '9': Expect ';' after expression.", "[line 99] Error at '0': Expect ';' after expression.", "[line 99] Error at '1': Expect ';' after expression.", "[line 99] Error at '2': Expect ';' after expression.", "[line 99] Error at '3': Expect ';' after expression.", "[line 99] Error at '4': Expect ';' after expression.", "[line 99] Error at '5': Expect ';' after expression.", "[line 99] Error at '6': Expect ';' after expression.", "[line 99] Error at '7': Expect ';' after expression.", "[line 100] Error at '8': Expect ';' after expression.", "[line 100] Error at '9': Expect ';' after expression."]
+
+---- run_file_test_tests_integration_logical_operator_or_truth_lox stdout ----
+/home/ultraman/workspace/lox/tests/integration/logical_operator/or_truth.lox
+
+thread 'run_file_test_tests_integration_logical_operator_or_truth_lox' panicked at tests/integration.rs:104:25:
+Program exited with failure, expected success
+
+---- run_file_test_tests_integration_logical_operator_or_lox stdout ----
+/home/ultraman/workspace/lox/tests/integration/logical_operator/or.lox
+
+thread 'run_file_test_tests_integration_logical_operator_or_lox' panicked at tests/integration.rs:104:25:
+Program exited with failure, expected success
+
+---- run_file_test_tests_integration_method_arity_lox stdout ----
+/home/ultraman/workspace/lox/tests/integration/method/arity.lox
+
+thread 'run_file_test_tests_integration_method_arity_lox' panicked at tests/integration.rs:104:25:
+Program exited with failure, expected success
+
+---- run_file_test_tests_integration_method_too_many_arguments_lox stdout ----
+/home/ultraman/workspace/lox/tests/integration/method/too_many_arguments.lox
+
+thread 'run_file_test_tests_integration_method_too_many_arguments_lox' panicked at tests/integration.rs:113:26:
+assertion `left == right` failed: Compile errors should have error code 65
+  left: 101
+ right: 65
+
+---- run_file_test_tests_integration_method_too_many_parameters_lox stdout ----
+/home/ultraman/workspace/lox/tests/integration/method/too_many_parameters.lox
+
+thread 'run_file_test_tests_integration_method_too_many_parameters_lox' panicked at tests/integration.rs:136:9:
+assertion `left == right` failed: Compile error should match
+  left: ["[line 258] Error at 'a': Can't have more than 255 parameters."]
+ right: ["[line 4] Error at '1': Expect ')' after parameters.", "[line 260] Error at end: Expect '}' after block."]
+
+---- run_file_test_tests_integration_operator_equals_method_lox stdout ----
+/home/ultraman/workspace/lox/tests/integration/operator/equals_method.lox
+
+thread 'run_file_test_tests_integration_operator_equals_method_lox' panicked at tests/integration.rs:139:5:
+assertion `left == right` failed: Output should match
+  left: ["true", "false"]
+ right: ["false", "false"]
+
+---- run_file_test_tests_integration_operator_equals_class_lox stdout ----
+/home/ultraman/workspace/lox/tests/integration/operator/equals_class.lox
+
+thread 'run_file_test_tests_integration_operator_equals_class_lox' panicked at tests/integration.rs:139:5:
+assertion `left == right` failed: Output should match
+  left: ["true", "false", "false", "true", "false", "false", "false", "false"]
+ right: ["false", "false", "false", "false", "false", "false", "false", "false"]
+
+---- run_file_test_tests_integration_variable_collide_with_parameter_lox stdout ----
+/home/ultraman/workspace/lox/tests/integration/variable/collide_with_parameter.lox
+
+thread 'run_file_test_tests_integration_variable_collide_with_parameter_lox' panicked at tests/integration.rs:136:9:
+assertion `left == right` failed: Compile error should match
+  left: ["[line 2] Error at 'a': Already variable with this name in this scope."]
+ right: ["[line 2] Error at 'a': Already a variable with this name in this scope."]
+
+---- run_file_test_tests_integration_variable_duplicate_local_lox stdout ----
+/home/ultraman/workspace/lox/tests/integration/variable/duplicate_local.lox
+
+thread 'run_file_test_tests_integration_variable_duplicate_local_lox' panicked at tests/integration.rs:136:9:
+assertion `left == right` failed: Compile error should match
+  left: ["[line 3] Error at 'a': Already variable with this name in this scope."]
+ right: ["[line 3] Error at 'a': Already a variable with this name in this scope."]
+
+---- run_file_test_tests_integration_variable_duplicate_parameter_lox stdout ----
+/home/ultraman/workspace/lox/tests/integration/variable/duplicate_parameter.lox
+
+thread 'run_file_test_tests_integration_variable_duplicate_parameter_lox' panicked at tests/integration.rs:136:9:
+assertion `left == right` failed: Compile error should match
+  left: ["[line 2] Error at 'arg': Already variable with this name in this scope."]
+ right: ["[line 2] Error at 'arg': Already a variable with this name in this scope."]
+
+---- run_file_test_tests_integration_while_closure_in_body_lox stdout ----
+/home/ultraman/workspace/lox/tests/integration/while/closure_in_body.lox
+
+thread 'run_file_test_tests_integration_while_closure_in_body_lox' panicked at tests/integration.rs:104:25:
+Program exited with failure, expected success
+
+
+failures:
+    run_file_test_tests_integration_closure_nested_closure_lox
+    run_file_test_tests_integration_constructor_call_init_explicitly_lox
+    run_file_test_tests_integration_field_method_binds_this_lox
+    run_file_test_tests_integration_field_set_evaluation_order_lox
+    run_file_test_tests_integration_for_closure_in_body_lox
+    run_file_test_tests_integration_function_parameters_lox
+    run_file_test_tests_integration_function_too_many_arguments_lox
+    run_file_test_tests_integration_function_too_many_parameters_lox
+    run_file_test_tests_integration_inheritance_set_fields_from_base_class_lox
+    run_file_test_tests_integration_limit_no_reuse_constants_lox
+    run_file_test_tests_integration_limit_stack_overflow_lox
+    run_file_test_tests_integration_limit_too_many_constants_lox
+    run_file_test_tests_integration_limit_too_many_locals_lox
+    run_file_test_tests_integration_limit_too_many_upvalues_lox
+    run_file_test_tests_integration_logical_operator_and_lox
+    run_file_test_tests_integration_logical_operator_and_truth_lox
+    run_file_test_tests_integration_logical_operator_or_lox
+    run_file_test_tests_integration_logical_operator_or_truth_lox
+    run_file_test_tests_integration_method_arity_lox
+    run_file_test_tests_integration_method_too_many_arguments_lox
+    run_file_test_tests_integration_method_too_many_parameters_lox
+    run_file_test_tests_integration_operator_equals_class_lox
+    run_file_test_tests_integration_operator_equals_method_lox
+    run_file_test_tests_integration_variable_collide_with_parameter_lox
+    run_file_test_tests_integration_variable_duplicate_local_lox
+    run_file_test_tests_integration_variable_duplicate_parameter_lox
+    run_file_test_tests_integration_while_closure_in_body_lox
+
+test result: FAILED. 216 passed; 27 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.48s
+

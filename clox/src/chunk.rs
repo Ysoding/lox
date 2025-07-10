@@ -4,7 +4,10 @@ use crate::{FunctionUpvalue, Gc, GcTraceFormatter};
 
 #[derive(Clone, Copy, Debug)]
 pub enum OpCode {
+    Inherit,
     Return,
+    GetSuper(u8),
+    SuperInvoke((u8, u8)),
     Invoke((u8, u8)),
     Method(u8),
     SetProperty(u8),
@@ -238,6 +241,11 @@ impl Chunk {
             OpCode::Method(c) => self.constant_instruction("OP_METHOD", *c, gc),
             OpCode::Invoke((name_constant, arg_count)) => {
                 self.invoke_instruction("OP_INVOKEK", *name_constant, *arg_count, gc)
+            }
+            OpCode::Inherit => self.simple_instruction("OP_INHERIT"),
+            OpCode::GetSuper(c) => self.constant_instruction("OP_METHOD", *c, gc),
+            OpCode::SuperInvoke((name_constant, arg_count)) => {
+                self.invoke_instruction("OP_SUPER_INVOKEK", *name_constant, *arg_count, gc)
             }
         }
         offset + 1
