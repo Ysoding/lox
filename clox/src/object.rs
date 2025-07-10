@@ -6,6 +6,86 @@ pub type NativeFunction = fn(Vec<Value>) -> Value;
 
 pub type Table = HashMap<GcRef<String>, Value>;
 
+#[derive(Debug)]
+pub struct Instance {
+    pub class: GcRef<Class>,
+    pub fields: Table,
+}
+
+impl Instance {
+    pub fn new(class: GcRef<Class>) -> Self {
+        Self {
+            class,
+            fields: Table::new(),
+        }
+    }
+}
+
+impl GcTrace for Instance {
+    fn format(&self, f: &mut std::fmt::Formatter, gc: &crate::Gc) -> std::fmt::Result {
+        let class = gc.deref(self.class);
+        let name = gc.deref(class.name);
+        write!(f, "{} instance", name)
+    }
+
+    fn size(&self) -> usize {
+        mem::size_of::<Instance>()
+            + self.fields.capacity() * (mem::size_of::<GcRef<String>>() + mem::size_of::<Value>())
+    }
+
+    fn trace(&self, gc: &mut crate::Gc) {
+        gc.mark_object(self.class);
+        gc.mark_table(&self.fields);
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
+}
+
+#[derive(Debug)]
+pub struct Class {
+    pub name: GcRef<String>,
+    pub methods: Table,
+}
+
+impl Class {
+    pub fn new(name: GcRef<String>) -> Self {
+        Self {
+            name,
+            methods: Table::new(),
+        }
+    }
+}
+
+impl GcTrace for Class {
+    fn format(&self, f: &mut std::fmt::Formatter, gc: &crate::Gc) -> std::fmt::Result {
+        let name = gc.deref(self.name);
+        write!(f, "{}", name)
+    }
+
+    fn size(&self) -> usize {
+        mem::size_of::<Class>()
+    }
+
+    fn trace(&self, gc: &mut crate::Gc) {
+        gc.mark_object(self.name);
+        gc.mark_table(&self.methods);
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
+}
+
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum FunctionType {
     Function,
@@ -18,7 +98,7 @@ pub struct FunctionUpvalue {
     pub is_local: bool,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Function {
     pub arity: u8,
     pub chunk: Chunk,
@@ -71,7 +151,7 @@ impl GcTrace for Function {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Closure {
     pub function: GcRef<Function>,
     pub upvalues: Vec<GcRef<Upvalue>>,
@@ -112,7 +192,7 @@ impl GcTrace for Closure {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Upvalue {
     pub location: usize,
     pub closed: Option<Value>,

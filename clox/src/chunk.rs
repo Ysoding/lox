@@ -1,10 +1,13 @@
-#[cfg(feature = "debug_trace_execution")]
-use crate::GcTraceFormatter;
 use crate::Value;
+#[cfg(feature = "debug_trace_execution")]
+use crate::{FunctionUpvalue, Gc, GcTraceFormatter};
 
 #[derive(Clone, Copy, Debug)]
 pub enum OpCode {
     Return,
+    SetProperty(u8),
+    GetProperty(u8),
+    Class(u8),
     Closure(u8),
     Constant(u8),
     ConstantLong(u32),
@@ -211,7 +214,6 @@ impl Chunk {
                     GcTraceFormatter::new(self.constants[*c as usize], gc)
                 );
 
-                use crate::{FunctionUpvalue, gc};
                 let function = self.constants[*c as usize].clone().as_function().unwrap();
                 let function = gc.deref(function);
                 function.upvalues.iter().for_each(|upvalue| {
@@ -228,6 +230,9 @@ impl Chunk {
             OpCode::GetUpvalue(c) => self.byte_instruction("OP_GET_UPVALUE", *c),
             OpCode::SetUpvalue(c) => self.byte_instruction("OP_SET_UPVALUE", *c),
             OpCode::CloseUpvalue => self.simple_instruction("OP_CLOSE_UPVALUE"),
+            OpCode::Class(c) => self.constant_instruction("OP_CLASS", *c, gc),
+            OpCode::SetProperty(c) => self.constant_instruction("OP_SET_PROPERTY", *c, gc),
+            OpCode::GetProperty(c) => self.constant_instruction("OP_GET_PROPERTY", *c, gc),
         }
         offset + 1
     }

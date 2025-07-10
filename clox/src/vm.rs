@@ -3,8 +3,8 @@ use std::fmt::Debug;
 use anyhow::Result;
 
 use crate::{
-    Chunk, Closure, Gc, GcRef, GcTrace, GcTraceFormatter, LoxError, NativeFunction, OpCode, Table,
-    Upvalue, Value, clock, compile,
+    Chunk, Class, Closure, Gc, GcRef, GcTrace, GcTraceFormatter, Instance, LoxError,
+    NativeFunction, OpCode, Table, Upvalue, Value, clock, compile,
 };
 
 macro_rules! binary_op {
@@ -309,6 +309,45 @@ impl VirtualMachine {
                     self.close_upvalues(self.stack.len() - 1);
                     self.pop();
                 }
+                OpCode::Class(c) => {
+                    let name = self.read_constant(c as usize).as_string().unwrap();
+                    let class = self.alloc(Class::new(name));
+                    self.push(Value::Class(class));
+                }
+                OpCode::SetProperty(c) => {
+                    let instance = self
+                        .peek(1)
+                        .as_instance()
+                        .map_err(|_msg| self.runtime_error("Only instances have fields."))?;
+
+                    let name = self.read_constant(c as usize).as_string().unwrap();
+
+                    let value = self.pop();
+                    let instance = self.gc.deref_mut(instance);
+                    instance.fields.insert(name, value);
+                    self.pop();
+                    self.push(value);
+                }
+                OpCode::GetProperty(c) => {
+                    let instance = self
+                        .peek(0)
+                        .as_instance()
+                        .map_err(|_msg| self.runtime_error("Only instances have properties."))?;
+                    let instance = self.gc.deref(instance);
+
+                    let name = self.read_constant(c as usize).as_string().unwrap();
+                    match instance.fields.get(&name) {
+                        Some(&v) => {
+                            self.pop();
+                            self.push(v);
+                        }
+                        None => {
+                            let name = self.gc.deref(name);
+                            let msg = format!("Undefined property '{}'.", name);
+                            return Err(self.runtime_error(&msg));
+                        }
+                    }
+                }
             }
         }
     }
@@ -386,6 +425,12 @@ impl VirtualMachine {
         let callee = self.peek(arg_count as usize);
         match callee {
             Value::Function(_f) => {}
+            Value::Class(class) => {
+                let instance = Instance::new(class);
+                let instance = self.alloc(instance);
+                let pos = self.stack.len() - 1 - arg_count as usize;
+                self.stack[pos] = Value::Instance(instance);
+            }
             Value::NativeFunction(f) => {
                 let left = self.stack.len() - arg_count as usize;
                 let result = f(self.stack[left..].to_vec());

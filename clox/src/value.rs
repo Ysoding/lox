@@ -1,16 +1,18 @@
 use anyhow::Result;
 
-use crate::{Closure, Function, GcRef, GcTrace, NativeFunction};
+use crate::{Class, Closure, Function, GcRef, GcTrace, Instance, NativeFunction};
 
 #[derive(Clone, Copy, Debug)]
 pub enum Value {
+    Nil,
     Number(f64),
     Bool(bool),
+    NativeFunction(NativeFunction),
     String(GcRef<String>),
     Function(GcRef<Function>),
     Closure(GcRef<Closure>),
-    NativeFunction(NativeFunction),
-    Nil,
+    Class(GcRef<Class>),
+    Instance(GcRef<Instance>),
 }
 
 impl Value {
@@ -25,6 +27,13 @@ impl Value {
         match self {
             Value::String(s) => Ok(s),
             _ => Err("cannot convert to String".into()),
+        }
+    }
+
+    pub fn as_instance(self) -> Result<GcRef<Instance>, String> {
+        match self {
+            Value::Instance(v) => Ok(v),
+            _ => Err("cannot convert to Instance".into()),
         }
     }
 
@@ -49,12 +58,23 @@ impl Value {
         }
     }
 
+    pub fn as_class(self) -> Result<GcRef<Class>, String> {
+        match self {
+            Value::Class(c) => Ok(c),
+            _ => Err("cannot convert to Class".into()),
+        }
+    }
+
     pub fn as_boolean(&self) -> bool {
         match self {
             Value::Number(v) => *v != 0.0,
             Value::Bool(v) => *v,
             _ => false,
         }
+    }
+
+    pub fn is_instance(&self) -> bool {
+        matches!(self, Value::Instance(_))
     }
 
     pub fn is_closure(&self) -> bool {
@@ -83,6 +103,10 @@ impl Value {
 
     pub fn is_function(&self) -> bool {
         matches!(self, Value::Function(_))
+    }
+
+    pub fn is_class(&self) -> bool {
+        matches!(self, Value::Class(_))
     }
 
     pub fn is_falsy(&self) -> bool {
@@ -122,6 +146,8 @@ impl GcTrace for Value {
             Value::String(v) => gc.deref(*v).format(f, gc),
             Value::Function(v) => gc.deref(*v).format(f, gc),
             Value::Closure(v) => gc.deref(*v).format(f, gc),
+            Value::Class(v) => gc.deref(*v).format(f, gc),
+            Value::Instance(v) => gc.deref(*v).format(f, gc),
         }
     }
 
@@ -134,6 +160,7 @@ impl GcTrace for Value {
             Value::String(v) => gc.mark_object(*v),
             Value::Function(v) => gc.mark_object(*v),
             Value::Closure(v) => gc.mark_object(*v),
+            Value::Class(v) => gc.mark_object(*v),
             _ => {}
         }
     }
