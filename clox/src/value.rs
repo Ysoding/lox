@@ -2,7 +2,7 @@ use anyhow::Result;
 
 use crate::{BoundMethod, Class, Closure, Function, GcRef, GcTrace, Instance, NativeFunction};
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Value {
     Nil,
     Number(f64),
@@ -119,16 +119,6 @@ impl Value {
 
     pub fn is_falsy(&self) -> bool {
         self.is_nil() || (self.is_boolean() && !self.as_boolean())
-    }
-
-    pub fn equal(&self, other: &Value) -> bool {
-        match (self, other) {
-            (Value::Bool(v1), Value::Bool(v2)) => *v1 == *v2,
-            (Value::Number(v1), Value::Number(v2)) => *v1 == *v2,
-            (Value::Nil, Value::Nil) => true,
-            (Value::String(v1), Value::String(v2)) => *v1 == *v2,
-            _ => false,
-        }
     }
 }
 

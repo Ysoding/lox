@@ -196,7 +196,7 @@ impl VirtualMachine {
                 OpCode::Equal => {
                     let a = self.pop();
                     let b = self.pop();
-                    self.push((a.equal(&b)).into());
+                    self.push((a == b).into());
                 }
                 OpCode::Greater => {
                     binary_op!(self, >);

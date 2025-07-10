@@ -111,13 +111,9 @@ impl<'a> Scanner<'a> {
         self.start = self.current;
 
         if let Some(ch) = self.advance() {
-            if ch.is_ascii_digit() {
-                return self.scan_number();
-            } else if is_alpha(ch) {
-                return self.scan_identifier();
-            }
-
             match ch {
+                ch if ch.is_ascii_digit() => return self.scan_number(),
+                ch if is_alpha(ch) => return self.scan_identifier(),
                 '(' => return self.make_token(TokenType::LeftParen),
                 ')' => return self.make_token(TokenType::RightParen),
                 '{' => return self.make_token(TokenType::LeftBrace),
@@ -280,7 +276,7 @@ impl<'a> Scanner<'a> {
     }
 
     fn scan_identifier(&mut self) -> Token<'a> {
-        while matches!(self.peek(), Some(&ch) if is_alpha(ch)) {
+        while matches!(self.peek(), Some(&ch) if is_alpha(ch) || ch.is_ascii_digit()) {
             self.advance();
         }
 
@@ -324,5 +320,5 @@ impl<'a> Iterator for Scanner<'a> {
 }
 
 fn is_alpha(ch: char) -> bool {
-    ch.is_alphabetic() || ch == '_'
+    ch.is_ascii_alphabetic() || ch == '_'
 }

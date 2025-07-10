@@ -256,12 +256,12 @@ impl<'a> Parser<'a> {
 
     fn emit_constant(&mut self, val: Value) {
         let constant = self.make_constant(val);
-        if constant < u8::MAX as usize {
+        if constant <= 255 {
             // Use OP_CONSTANT for indices 0-255
             self.emit_byte(OpCode::Constant(constant as u8));
-        } else if constant < (1 << 24) {
-            // Use OP_CONSTANT_LONG for indices 256-16,777,215
-            self.emit_byte(OpCode::ConstantLong(constant as u32));
+        // } else if constant < (1 << 24) {
+        //     // Use OP_CONSTANT_LONG for indices 256-16,777,215
+        //     self.emit_byte(OpCode::ConstantLong(constant as u32));
         } else {
             self.error("Too many constants in one chunk.");
         }
@@ -299,11 +299,11 @@ impl<'a> Parser<'a> {
     }
 
     fn argument_list(&mut self) -> u8 {
-        let mut arg_count = 0;
+        let mut arg_count: usize = 0;
         if !self.check(TokenType::RightParen) {
             loop {
                 self.expression();
-                if arg_count == u8::MAX {
+                if arg_count == u8::MAX as usize {
                     self.error("Can't have more than 255 arguments.");
                 }
 
@@ -314,7 +314,7 @@ impl<'a> Parser<'a> {
             }
         }
         self.consume(TokenType::RightParen, "Expect ')' after arguments.");
-        arg_count
+        arg_count as u8
     }
 
     fn grouping(&mut self, _can_assign: bool) {
@@ -842,7 +842,7 @@ impl<'a> Parser<'a> {
             }
 
             if name.lexeme.eq(local.name.lexeme) {
-                self.error("Already a variable with this name in this scope.");
+                self.error("Already variable with this name in this scope.");
             }
         }
 
@@ -988,7 +988,7 @@ impl<'a> ParseRule<'a> {
             TokenType::Identifier => Self::new(Some(Parser::variable), None, Precedence::None),
             TokenType::String => Self::new(Some(Parser::string), None, Precedence::None),
             TokenType::Number => Self::new(Some(Parser::number), None, Precedence::None),
-            TokenType::And => Self::new(None, Some(Parser::and), Precedence::None),
+            TokenType::And => Self::new(None, Some(Parser::and), Precedence::And),
             TokenType::Class => Self::new(None, None, Precedence::None),
             TokenType::Else => Self::new(None, None, Precedence::None),
             TokenType::False => Self::new(Some(Parser::literal), None, Precedence::None),
@@ -996,7 +996,7 @@ impl<'a> ParseRule<'a> {
             TokenType::For => Self::new(None, None, Precedence::None),
             TokenType::If => Self::new(None, None, Precedence::None),
             TokenType::Nil => Self::new(Some(Parser::literal), None, Precedence::None),
-            TokenType::Or => Self::new(None, Some(Parser::or), Precedence::None),
+            TokenType::Or => Self::new(None, Some(Parser::or), Precedence::Or),
             TokenType::Print => Self::new(None, None, Precedence::None),
             TokenType::Return => Self::new(None, None, Precedence::None),
             TokenType::Super => Self::new(Some(Parser::super_), None, Precedence::None),
