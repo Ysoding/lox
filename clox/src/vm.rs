@@ -22,7 +22,7 @@ pub struct VirtualMachine {
     stack: Vec<Value>,
     globals: Table,
     frames: Vec<CallFrame>,
-    open_upvalues: Option<GcRef<Upvalue>>,
+    open_upvalues: Vec<GcRef<Upvalue>>,
     gc: Gc,
 }
 
@@ -32,7 +32,7 @@ impl VirtualMachine {
             stack: Vec::with_capacity(STACK_MAX_SIZE),
             globals: Table::new(),
             frames: Vec::with_capacity(FRAME_MAX_SIZE),
-            open_upvalues: None,
+            open_upvalues: Vec::new(),
             gc: Gc::new(),
         };
         vm.define_native("clock", clock);
@@ -97,7 +97,7 @@ impl VirtualMachine {
             self.gc.mark_object(frame.closure)
         }
 
-        while let Some(upvalue) = self.open_upvalues {
+        for &upvalue in &self.open_upvalues {
             self.gc.mark_object(upvalue);
         }
 
@@ -125,6 +125,7 @@ impl VirtualMachine {
                 OpCode::Return => {
                     let result = self.pop();
                     let frame = self.frames.pop().unwrap();
+                    self.close_upvalues(frame.slot_start);
 
                     if self.frames.is_empty() {
                         self.pop();
@@ -304,7 +305,10 @@ impl VirtualMachine {
                         upvalue.closed = Some(value);
                     }
                 }
-                OpCode::CloseUpvalue => {}
+                OpCode::CloseUpvalue => {
+                    self.close_upvalues(self.stack.len() - 1);
+                    self.pop();
+                }
             }
         }
     }
@@ -429,9 +433,33 @@ impl VirtualMachine {
     }
 
     fn capture_upvalue(&mut self, location: usize) -> GcRef<Upvalue> {
+        for &ele in &self.open_upvalues {
+            let upvalue = self.gc.deref(ele);
+            if upvalue.location == location {
+                return ele;
+            }
+        }
+
         let created_upvalue = Upvalue::new(location);
         let created_upvalue = self.alloc(created_upvalue);
+        self.open_upvalues.push(created_upvalue);
         created_upvalue
+    }
+
+    fn close_upvalues(&mut self, last: usize) {
+        let mut i = 0;
+
+        while i != self.open_upvalues.len() {
+            let upvalue = self.open_upvalues[i];
+            let upvalue = self.gc.deref_mut(upvalue);
+            if upvalue.location >= last {
+                self.open_upvalues.remove(i);
+                let localtion = upvalue.location;
+                upvalue.closed = Some(self.stack[localtion]);
+            } else {
+                i += 1;
+            }
+        }
     }
 }
 
